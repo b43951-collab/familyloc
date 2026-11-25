@@ -90,6 +90,7 @@ fun AppRoot(repo: FamilyRepository, tick: Int) {
         Session.READY -> MainTabs(repo, tick)
     }
     UpdateHost()
+    if (session == Session.READY) com.myfamily.locshare.ui.HideNotiHost()
 }
 
 @Composable
