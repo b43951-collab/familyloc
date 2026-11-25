@@ -129,7 +129,8 @@ fun FamilyMapView(
             object : KakaoMapReadyCallback() {
                 override fun onMapReady(map: KakaoMap) {
                     map.setOnLabelClickListener { _, _, label ->
-                        (label.tag as? String)?.let { memberClick(it) }
+                        (label?.tag as? String)?.let { memberClick(it) }
+                        true
                     }
                     map.setOnCameraMoveEndListener { _, pos, _ ->
                         centerCallback?.invoke(pos.position.latitude, pos.position.longitude)
@@ -188,8 +189,8 @@ fun FamilyMapView(
     // 장소 원 / 경로 / 가족 마커 다시 그리기
     LaunchedEffect(kakaoMap, members, places, track, selectedId) {
         val map = kakaoMap ?: return@LaunchedEffect
-        val shapes = map.shapeManager!!.layer
-        val labels = map.labelManager!!.layer
+        val shapes = map.shapeManager!!.layer!!
+        val labels = map.labelManager!!.layer!!
         shapes.removeAll()
         labels.removeAll()
 
