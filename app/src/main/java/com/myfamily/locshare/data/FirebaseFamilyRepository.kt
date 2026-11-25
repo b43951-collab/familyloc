@@ -17,6 +17,7 @@ import com.google.firebase.database.ValueEventListener
 import com.myfamily.locshare.location.LocationService
 import com.myfamily.locshare.location.Notifier
 import com.myfamily.locshare.util.Geo
+import com.myfamily.locshare.location.Ringer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.random.Random
@@ -32,6 +33,7 @@ import kotlin.random.Random
  *   circles/{cid}/loc/{uid}            {lat,lng,acc,spd,bat,chg,t,sharing}
  *   circles/{cid}/places/{pid}         {name,lat,lng,r,kind}
  *   circles/{cid}/events/{eid}         {text,t,kind,uid}
+ *   circles/{cid}/cmd/{uid}            {type,t,by}  가족이 보내는 분실 대응 명령 (RING/STOP/SAVER/NORMAL/TRACK)
  *   circles/{cid}/refresh              마지막 "새로고침 요청" 시각 (바뀌면 모든 폰이 위치 갱신)
  *
  * 푸시 서버(Cloud Functions) 없이, 위치 서비스가 켜져 있는 동안 각 폰이 DB 변경을 직접 감지한다.
@@ -348,8 +350,39 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
             }
         }
 
+        // 분실 대응 명령 (내 폰으로 온 것만)
+        uid?.let { me ->
+            listen(db.getReference("circles/$c/cmd/$me")) { s -> onCommand(s) }
+        }
+
         _session.value = Session.READY
         if (_settings.value.sharing) LocationService.start(app)
+    }
+
+    private var lastCmdT = 0L
+
+    private fun onCommand(s: DataSnapshot) {
+        val type = s.child("type").value as? String ?: return
+        val t = s.num("t")?.toLong() ?: return
+        if (t == lastCmdT) return
+        lastCmdT = t
+        if (kotlin.math.abs(System.currentTimeMillis() - t) > 90_000L) return // 오래된 명령은 무시
+        when (type) {
+            "RING" -> Ringer.start(app)
+            "STOP" -> Ringer.stop()
+            "SAVER" -> setMode(0)
+            "NORMAL" -> setMode(2)
+            "TRACK" -> LocationService.boost(app, 10 * 60_000L)
+        }
+    }
+
+    override fun sendCommand(targetId: String, type: String) {
+        val c = cid ?: return
+        val m = HashMap<String, Any>()
+        m["type"] = type
+        m["t"] = ServerValue.TIMESTAMP
+        m["by"] = uid ?: ""
+        db.getReference("circles/$c/cmd/$targetId").setValue(m)
     }
 
     private fun detach() {
@@ -455,6 +488,12 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         if (charging || b >= 30) {
             if (prefs.getBoolean("low_sent", false)) prefs.edit().putBoolean("low_sent", false).apply()
             return
+        }
+        if (b <= 5 && !prefs.getBoolean("low5_sent", false)) {
+            prefs.edit().putBoolean("low5_sent", true).apply()
+            pushEvent("INFO", "${_profile.value.name} 님의 배터리가 ${b}%예요. 곧 꺼질 수 있어요 (마지막 위치가 기록됐어요)")
+        } else if (b > 8 && prefs.getBoolean("low5_sent", false)) {
+            prefs.edit().putBoolean("low5_sent", false).apply()
         }
         if (b <= 20 && !prefs.getBoolean("low_sent", false)) {
             prefs.edit().putBoolean("low_sent", true).apply()

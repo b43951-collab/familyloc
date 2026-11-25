@@ -26,6 +26,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
@@ -50,6 +51,7 @@ import com.myfamily.locshare.data.Member
 import com.myfamily.locshare.data.Place
 import com.myfamily.locshare.util.Fmt
 import com.myfamily.locshare.util.Geo
+import com.myfamily.locshare.location.Ringer
 import com.myfamily.locshare.util.Perms
 import com.myfamily.locshare.util.Status
 
@@ -93,6 +95,22 @@ fun MapScreen(repo: FamilyRepository, tick: Int, onOpenSettings: () -> Unit) {
             focus = focus,
             onMemberClick = { selectedId = it },
         )
+
+        val ringing by Ringer.ringing.collectAsState()
+        if (ringing) {
+            Card(
+                Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+            ) {
+                Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("📣 가족이 이 폰을 찾고 있어요", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = { Ringer.stop() }) { Text("벨 끄기") }
+                }
+            }
+        }
 
         // ---- 상단: 가족 칩 + 안내 배너 ----
         Column(
@@ -192,7 +210,7 @@ fun MapScreen(repo: FamilyRepository, tick: Int, onOpenSettings: () -> Unit) {
                 Icon(Icons.Default.LocationOn, contentDescription = "내 위치")
             }
             if (selected != null) {
-                MemberCard(selected, places, now) { selectedId = null }
+                MemberCard(selected, places, now, { selectedId = null }) { type -> repo.sendCommand(selected.id, type) }
             }
         }
     }
@@ -214,7 +232,9 @@ fun MapScreen(repo: FamilyRepository, tick: Int, onOpenSettings: () -> Unit) {
 }
 
 @Composable
-private fun MemberCard(m: Member, places: List<Place>, now: Long, onClose: () -> Unit) {
+private fun MemberCard(m: Member, places: List<Place>, now: Long, onClose: () -> Unit, onCommand: (String) -> Unit) {
+    var ringSent by remember(m.id) { mutableStateOf(false) }
+    var saverSent by remember(m.id) { mutableStateOf(false) }
     val ctx = LocalContext.current
     val addr = rememberAddress(m.lat, m.lng)
     val inPlace = places.firstOrNull { Geo.distM(m.lat, m.lng, it.lat, it.lng) <= it.radiusM }
@@ -268,6 +288,26 @@ private fun MemberCard(m: Member, places: List<Place>, now: Long, onClose: () ->
                     Toast.makeText(ctx, "지도 앱을 열 수 없어요", Toast.LENGTH_SHORT).show()
                 }
             }) { Text("지도앱으로 열기 / 길찾기") }
+            if (!m.isMe) {
+                Spacer(Modifier.height(4.dp))
+                Text("폰 찾기", fontSize = 12.sp, color = Color.Gray)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Button(onClick = {
+                        onCommand(if (ringSent) "STOP" else "RING")
+                        ringSent = !ringSent
+                        Toast.makeText(ctx, if (ringSent) "벨을 울렸어요 (60초 뒤 자동 종료)" else "벨을 껐어요", Toast.LENGTH_SHORT).show()
+                    }) { Text(if (ringSent) "🔕 벨 끄기" else "📣 벨 울리기", fontSize = 12.sp) }
+                    OutlinedButton(onClick = {
+                        onCommand("TRACK")
+                        Toast.makeText(ctx, "10분간 5초마다 위치를 받아요", Toast.LENGTH_SHORT).show()
+                    }) { Text("📍 실시간", fontSize = 12.sp) }
+                    OutlinedButton(onClick = {
+                        onCommand(if (saverSent) "NORMAL" else "SAVER")
+                        saverSent = !saverSent
+                        Toast.makeText(ctx, if (saverSent) "상대 폰을 슈퍼 절전으로 바꿨어요" else "보통 모드로 되돌렸어요", Toast.LENGTH_SHORT).show()
+                    }) { Text(if (saverSent) "🔋 보통" else "🔋 절전", fontSize = 12.sp) }
+                }
+            }
         }
     }
 }

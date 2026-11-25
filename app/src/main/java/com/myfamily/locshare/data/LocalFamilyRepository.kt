@@ -249,6 +249,8 @@ class LocalFamilyRepository(context: Context) : FamilyRepository {
         }
     }
 
+    override fun sendCommand(targetId: String, type: String) {}
+
     override fun sendSos() {
         synchronized(lock) {
             pushEvent("SOS", "SOS를 보냈어요 (서버 연동 전이라 이 폰에만 기록돼요)")

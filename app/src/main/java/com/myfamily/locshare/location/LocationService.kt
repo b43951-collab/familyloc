@@ -58,10 +58,11 @@ class LocationService : Service() {
             }
         }
 
-        fun boost(ctx: Context) {
+        fun boost(ctx: Context, durationMs: Long = 60_000L) {
             if (!Perms.fine(ctx)) return
             try {
                 val i = Intent(ctx, LocationService::class.java).setAction(ACTION_BOOST)
+                    .putExtra("ms", durationMs)
                 ContextCompat.startForegroundService(ctx, i)
             } catch (e: Exception) {
                 // 무시
@@ -107,10 +108,11 @@ class LocationService : Service() {
             return START_NOT_STICKY
         }
         if (intent?.action == ACTION_BOOST) {
-            boostUntil = SystemClock.elapsedRealtime() + 60_000L
+            val ms = intent.getLongExtra("ms", 60_000L)
+            boostUntil = maxOf(boostUntil, SystemClock.elapsedRealtime() + ms)
             applyRequest()
             scope.launch {
-                delay(61_000L)
+                delay(ms + 1_000L)
                 applyRequest()
             }
         }

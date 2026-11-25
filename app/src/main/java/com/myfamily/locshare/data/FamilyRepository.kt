@@ -57,6 +57,8 @@ interface FamilyRepository {
     fun setDistanceAlert(on: Boolean, meters: Int, targetId: String)
     fun setEmoji(emoji: String)
     fun sendSos()
+    /** 분실 대응: type = RING | STOP | SAVER | NORMAL | TRACK */
+    fun sendCommand(targetId: String, type: String)
     fun requestRefresh()
     fun history(fromMs: Long, toMs: Long): List<TrackPoint>
     fun clearEvents()
