@@ -5,6 +5,9 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,3 +30,11 @@ jobs:
         with:
           name: FamilyLoc-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish release (APK 직접 다운로드용)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk eodijji.apk
+          TAG="build-${{ github.run_number }}"
+          gh release create "$TAG" eodijji.apk --title "어디찌? 빌드 ${{ github.run_number }}" --notes "폰에서 eodijji.apk 를 눌러 설치" --latest
