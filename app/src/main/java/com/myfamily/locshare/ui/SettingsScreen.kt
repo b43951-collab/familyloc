@@ -207,6 +207,16 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
                         }
                     }
                 }
+                OutlinedButton(onClick = {
+                    try {
+                        val i = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                            .putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName)
+                            .putExtra(Settings.EXTRA_CHANNEL_ID, "sharing_min")
+                        ctx.startActivity(i)
+                    } catch (e: Exception) {
+                        Toast.makeText(ctx, "설정 화면을 열 수 없어요", Toast.LENGTH_SHORT).show()
+                    }
+                }) { Text("위치 공유 알림 숨기기 (설정 열기)") }
             }
         }
 
