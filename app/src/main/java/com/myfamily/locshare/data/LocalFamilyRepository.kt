@@ -180,7 +180,9 @@ class LocalFamilyRepository(context: Context) : FamilyRepository {
         appendHistory(lat, lng, time)
     }
 
-    override fun addPlace(name: String, lat: Double, lng: Double, radiusM: Int, kind: String) {
+    override fun setPlaceShared(id: String, shared: Boolean) {}
+
+    override fun addPlace(name: String, lat: Double, lng: Double, radiusM: Int, kind: String, shared: Boolean) {
         synchronized(lock) {
             val list = _places.value + Place(UUID.randomUUID().toString(), name.trim().ifEmpty { kind }, lat, lng, radiusM, kind)
             _places.value = list

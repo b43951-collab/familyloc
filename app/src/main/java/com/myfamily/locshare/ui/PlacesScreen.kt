@@ -52,6 +52,7 @@ fun PlacesScreen(repo: FamilyRepository) {
     val members by repo.members.collectAsState()
     val places by repo.places.collectAsState()
     val me = members.firstOrNull { it.isMe }
+    val myId = me?.id ?: ""
 
     var focus by remember {
         mutableStateOf(
@@ -122,6 +123,8 @@ fun PlacesScreen(repo: FamilyRepository) {
             items(places, key = { it.id }) { p ->
                 PlaceRow(
                     p,
+                    mine = p.owner.isNotEmpty() && p.owner == myId,
+                    onShare = { repo.setPlaceShared(p.id, it) },
                     onClick = { focus = MapFocus(p.lat, p.lng, 17.0, System.nanoTime()) },
                     onDelete = { repo.removePlace(p.id) },
                 )
@@ -133,8 +136,8 @@ fun PlacesScreen(repo: FamilyRepository) {
     if (showAdd) {
         AddPlaceDialog(
             onDismiss = { showAdd = false },
-            onAdd = { name, kind, radius ->
-                repo.addPlace(name, center.first, center.second, radius, kind)
+            onAdd = { name, kind, radius, shared ->
+                repo.addPlace(name, center.first, center.second, radius, kind, shared)
                 showAdd = false
             },
         )
@@ -142,7 +145,7 @@ fun PlacesScreen(repo: FamilyRepository) {
 }
 
 @Composable
-private fun PlaceRow(p: Place, onClick: () -> Unit, onDelete: () -> Unit) {
+private fun PlaceRow(p: Place, mine: Boolean, onShare: (Boolean) -> Unit, onClick: () -> Unit, onDelete: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -158,7 +161,14 @@ private fun PlaceRow(p: Place, onClick: () -> Unit, onDelete: () -> Unit) {
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(p.name, fontWeight = FontWeight.Bold)
-            Text("${p.kind} · 반경 ${p.radiusM}m", fontSize = 12.sp, color = Color.Gray)
+            Text(
+                "${p.kind} · 반경 ${p.radiusM}m · " + (if (p.shared) "가족 공유" else "나만 보기"),
+                fontSize = 12.sp,
+                color = Color.Gray,
+            )
+        }
+        if (mine) {
+            androidx.compose.material3.Checkbox(checked = p.shared, onCheckedChange = onShare)
         }
         IconButton(onClick = onDelete) {
             Icon(Icons.Default.Delete, contentDescription = "삭제")
@@ -167,7 +177,8 @@ private fun PlaceRow(p: Place, onClick: () -> Unit, onDelete: () -> Unit) {
 }
 
 @Composable
-private fun AddPlaceDialog(onDismiss: () -> Unit, onAdd: (String, String, Int) -> Unit) {
+private fun AddPlaceDialog(onDismiss: () -> Unit, onAdd: (String, String, Int, Boolean) -> Unit) {
+    var shared by remember { mutableStateOf(true) }
     var name by remember { mutableStateOf("") }
     var kind by remember { mutableStateOf("집") }
     var radius by remember { mutableStateOf(150f) }
@@ -201,10 +212,17 @@ private fun AddPlaceDialog(onDismiss: () -> Unit, onAdd: (String, String, Int) -
                     valueRange = 50f..500f,
                     steps = 8,
                 )
+                Row(
+                    Modifier.clickable { shared = !shared },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    androidx.compose.material3.Checkbox(checked = shared, onCheckedChange = { shared = it })
+                    Text("가족과 공유 (가족 장소에 자동 추가)", fontSize = 14.sp)
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onAdd(name, kind, radius.toInt()) }) { Text("추가") }
+            TextButton(onClick = { onAdd(name, kind, radius.toInt(), shared) }) { Text("추가") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
     )

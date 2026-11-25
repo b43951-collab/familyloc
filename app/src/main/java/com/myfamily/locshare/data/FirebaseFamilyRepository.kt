@@ -311,7 +311,9 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
                 val lng = ch.num("lng") ?: continue
                 val r = (ch.num("r") ?: 150.0).toInt()
                 val kind = ch.child("kind").value as? String ?: "기타"
-                list.add(Place(id, name, lat, lng, r, kind))
+                val shared = ch.child("shared").value as? Boolean ?: true // 예전 장소는 모두 공유
+                val owner = ch.child("owner").value as? String ?: ""
+                if (shared || owner == uid) list.add(Place(id, name, lat, lng, r, kind, shared, owner))
             }
             _places.value = list
             insideMe = null // 장소가 바뀌면 현재 상태부터 다시 기준을 잡는다
@@ -475,8 +477,10 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
             for (p in ps) {
                 val was = prev.contains(p.id)
                 val now = cur.contains(p.id)
-                if (!was && now) pushEvent("ARRIVE", "$who ${p.name}에 도착했어요")
-                if (was && !now) pushEvent("LEAVE", "$who ${p.name}에서 출발했어요")
+                val arrive = "$who ${p.name}에 도착했어요"
+                val leave = "$who ${p.name}에서 출발했어요"
+                if (!was && now) { if (p.shared) pushEvent("ARRIVE", arrive) else Notifier.alert(app, arrive) }
+                if (was && !now) { if (p.shared) pushEvent("LEAVE", leave) else Notifier.alert(app, leave) }
             }
         }
         insideMe = cur
@@ -512,9 +516,16 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         Notifier.alert(app, text) // 내 폰에도 알림 (다른 가족은 DB 변경을 감지해서 알림)
     }
 
-    override fun addPlace(name: String, lat: Double, lng: Double, radiusM: Int, kind: String) {
+    override fun setPlaceShared(id: String, shared: Boolean) {
+        val c = cid ?: return
+        db.getReference("circles/$c/places/$id/shared").setValue(shared)
+    }
+
+    override fun addPlace(name: String, lat: Double, lng: Double, radiusM: Int, kind: String, shared: Boolean) {
         val c = cid ?: return
         val m = HashMap<String, Any>()
+        m["shared"] = shared
+        m["owner"] = uid ?: ""
         m["name"] = name.trim().ifEmpty { kind }
         m["lat"] = lat
         m["lng"] = lng

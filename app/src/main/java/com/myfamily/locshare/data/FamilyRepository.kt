@@ -47,7 +47,8 @@ interface FamilyRepository {
         time: Long,
     )
 
-    fun addPlace(name: String, lat: Double, lng: Double, radiusM: Int, kind: String)
+    fun addPlace(name: String, lat: Double, lng: Double, radiusM: Int, kind: String, shared: Boolean)
+    fun setPlaceShared(id: String, shared: Boolean)
     fun removePlace(id: String)
     fun updateProfile(name: String, color: Long)
     fun setSharing(on: Boolean)

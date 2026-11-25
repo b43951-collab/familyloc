@@ -25,6 +25,9 @@ data class Place(
     val lng: Double,
     val radiusM: Int,
     val kind: String,
+    /** true면 가족 모두의 장소에 자동 추가, false면 만든 사람만 봄 */
+    val shared: Boolean = true,
+    val owner: String = "",
 )
 
 /** 알림 기록. kind = ARRIVE / LEAVE / SOS / INFO */
