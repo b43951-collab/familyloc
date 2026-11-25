@@ -9,13 +9,15 @@ import android.content.Intent
 import com.myfamily.locshare.MainActivity
 
 object Notifier {
-    const val CH_SERVICE = "sharing"
+    // 채널 중요도는 만든 뒤에 못 바꿔서, 최소 중요도용 새 채널을 쓰고 예전 "sharing" 채널은 지운다.
+    const val CH_SERVICE = "sharing_min"
     const val CH_ALERT = "alerts"
 
     fun ensureChannels(ctx: Context) {
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.deleteNotificationChannel("sharing")
         nm.createNotificationChannel(
-            NotificationChannel(CH_SERVICE, "위치 공유 상태", NotificationManager.IMPORTANCE_LOW).apply {
+            NotificationChannel(CH_SERVICE, "위치 공유 상태", NotificationManager.IMPORTANCE_MIN).apply {
                 description = "위치를 공유하는 동안 표시되는 알림 (끄면 앱이 종료될 수 있어요)"
                 setShowBadge(false)
             }
@@ -38,6 +40,7 @@ object Notifier {
             .setContentTitle("가족과 위치 공유 중")
             .setContentText("가족이 내 위치를 볼 수 있어요")
             .setOngoing(true)
+            .setVisibility(Notification.VISIBILITY_SECRET)
             .setContentIntent(openAppIntent(ctx))
             .build()
 
