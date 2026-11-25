@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "901151546834",
+    "project_id": "familyloc-f00ad",
+    "storage_bucket": "familyloc-f00ad.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:901151546834:android:fe7e1287ccd4876ce43c0b",
+        "android_client_info": {
+          "package_name": "com.myfamily.locshare"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBH6-8FGb5ao8qsbMFwUqyNcQXoDryV6dw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

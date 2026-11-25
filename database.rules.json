@@ -1,0 +1,61 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "codes": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && !data.exists()",
+        ".validate": "newData.isString() && newData.val().length < 40"
+      }
+    },
+
+    "circles": {
+      "$cid": {
+        ".read": "auth != null && root.child('circles').child($cid).child('members').child(auth.uid).exists()",
+
+        "code": {
+          ".write": "auth != null && !data.exists()",
+          ".validate": "newData.isString() && newData.val().length === 6"
+        },
+
+        "members": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && (root.child('circles').child($cid).child('members').child(auth.uid).exists() || newData.child('k').val() === root.child('circles').child($cid).child('code').val() || !root.child('circles').child($cid).child('code').exists())",
+            ".validate": "newData.hasChildren(['k', 'name', 'color'])"
+          }
+        },
+
+        "loc": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('circles').child($cid).child('members').child(auth.uid).exists()"
+          }
+        },
+
+        "places": {
+          "$pid": {
+            ".write": "auth != null && root.child('circles').child($cid).child('members').child(auth.uid).exists()"
+          }
+        },
+
+        "events": {
+          "$eid": {
+            ".write": "auth != null && root.child('circles').child($cid).child('members').child(auth.uid).exists()"
+          }
+        },
+
+        "refresh": {
+          ".write": "auth != null && root.child('circles').child($cid).child('members').child(auth.uid).exists()"
+        }
+      }
+    }
+  }
+}
