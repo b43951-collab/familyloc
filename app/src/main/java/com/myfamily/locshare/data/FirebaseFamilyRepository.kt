@@ -159,7 +159,7 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
 
     private fun randomCode(): String {
         val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-        return (1..6).map { chars[Random.nextInt(chars.length)] }.joinToString("")
+        return (1..10).map { chars[Random.nextInt(chars.length)] }.joinToString("")
     }
 
     override fun createCircle(onResult: (String?) -> Unit) {
@@ -186,7 +186,7 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         val u = uid ?: return onResult("로그인이 필요해요")
         if (cid != null) return onResult("이미 서클에 들어 있어요")
         val cc = code.trim().uppercase()
-        if (cc.length != 6) return onResult("코드는 6자리예요")
+        if (cc.length != 6 && cc.length != 10) return onResult("코드는 10자리예요")
         db.getReference("codes/$cc").get().addOnCompleteListener { t ->
             if (!t.isSuccessful) {
                 onResult(msg(t.exception))

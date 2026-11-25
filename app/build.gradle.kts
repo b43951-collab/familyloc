@@ -13,8 +13,9 @@ android {
         applicationId = "com.myfamily.locshare"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        // GitHub Actions 실행 번호 = 릴리스 태그(build-N) = versionCode. 앱 내 업데이트가 이 숫자로 새 버전을 판단한다.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionName = "0.2"
     }
 
     // 고정 서명키: GitHub Actions에서 빌드할 때마다 키가 바뀌어

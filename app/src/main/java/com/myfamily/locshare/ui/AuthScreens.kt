@@ -166,8 +166,8 @@ fun CircleScreen(repo: FamilyRepository) {
         Spacer(Modifier.height(8.dp))
         OutlinedTextField(
             value = code,
-            onValueChange = { code = it.uppercase().filter { ch -> ch.isLetterOrDigit() }.take(6) },
-            label = { Text("서클 코드 6자리") },
+            onValueChange = { code = it.uppercase().filter { ch -> ch.isLetterOrDigit() }.take(10) },
+            label = { Text("서클 코드 (10자리)") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -181,7 +181,7 @@ fun CircleScreen(repo: FamilyRepository) {
                     err = e
                 }
             },
-            enabled = !busy && code.length == 6,
+            enabled = !busy && (code.length == 6 || code.length == 10),
             modifier = Modifier.fillMaxWidth(),
         ) { Text("코드로 참여") }
 

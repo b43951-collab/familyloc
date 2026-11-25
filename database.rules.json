@@ -24,7 +24,7 @@
 
         "code": {
           ".write": "auth != null && !data.exists()",
-          ".validate": "newData.isString() && newData.val().length === 6"
+          ".validate": "newData.isString() && (newData.val().length === 6 || newData.val().length === 10)"
         },
 
         "members": {

@@ -31,6 +31,7 @@ import com.myfamily.locshare.data.FamilyRepository
 import com.myfamily.locshare.data.ServiceLocator
 import com.myfamily.locshare.data.Session
 import com.myfamily.locshare.location.LocationService
+import com.myfamily.locshare.ui.UpdateHost
 import com.myfamily.locshare.ui.AlertsScreen
 import com.myfamily.locshare.ui.AppTheme
 import com.myfamily.locshare.ui.AuthScreen
@@ -88,6 +89,7 @@ fun AppRoot(repo: FamilyRepository, tick: Int) {
         Session.NO_CIRCLE -> CircleScreen(repo)
         Session.READY -> MainTabs(repo, tick)
     }
+    UpdateHost()
 }
 
 @Composable

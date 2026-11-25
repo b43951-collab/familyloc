@@ -252,6 +252,12 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
                     settings.demo,
                 ) { repo.setDemo(it) }
                 Spacer(Modifier.height(6.dp))
+                val updCtx = LocalContext.current
+                OutlinedButton(
+                    onClick = { com.myfamily.locshare.util.UpdateManager.check(updCtx, manual = true) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("업데이트 확인 (현재 빌드 ${com.myfamily.locshare.util.UpdateManager.installedBuild(updCtx)})") }
+                Spacer(Modifier.height(6.dp))
                 Text(
                     (if (repo.supportsDemo) "어디찌? v0.1 · 로컬 전용(서버 미연동)" else "어디찌? v0.1 · Firebase 서버 연동") +
                         "\n지도: 카카오맵",
