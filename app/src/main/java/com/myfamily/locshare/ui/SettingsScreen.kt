@@ -220,6 +220,28 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
             }
         }
 
+        // ---------- 도착/출발 알림 대상 ----------
+        item {
+            SectionCard("도착/출발 알림 받을 가족") {
+                val others = members.filter { !it.isMe }
+                Text(
+                    "끈 가족이 장소에 들어오거나 나가도 이 폰에는 알림이 뜨지 않아요. (SOS는 항상 와요)",
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                )
+                if (others.isEmpty()) {
+                    Text("가족이 서클에 들어오면 여기에 나타나요", fontSize = 12.sp, color = Color.Gray)
+                }
+                others.forEach { o ->
+                    SwitchRow(
+                        o.name,
+                        if (o.id in settings.muted) "알림 꺼짐" else "알림 켜짐",
+                        o.id !in settings.muted,
+                    ) { repo.setMemberAlert(o.id, it) }
+                }
+            }
+        }
+
         // ---------- 거리 알림 ----------
         item {
             SectionCard("거리 알림") {

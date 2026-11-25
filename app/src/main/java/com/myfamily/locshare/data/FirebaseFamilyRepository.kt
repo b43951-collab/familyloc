@@ -84,6 +84,7 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
             distOn = prefs.getBoolean("dist_on", false),
             distM = prefs.getInt("dist_m", 1000),
             distTarget = prefs.getString("dist_target", "") ?: "",
+            muted = prefs.getStringSet("muted_ids", emptySet())?.toSet() ?: emptySet(),
         )
     )
 
@@ -330,7 +331,8 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
                 val kind = ch.child("kind").value as? String ?: "INFO"
                 val by = ch.child("uid").value as? String
                 list.add(AlertEvent(id, text, t, kind))
-                if (seen.add(id) && !firstLoad && by != uid) Notifier.alert(app, text)
+                val mutedHere = (kind == "ARRIVE" || kind == "LEAVE") && by != null && by in _settings.value.muted
+                if (seen.add(id) && !firstLoad && by != uid && !mutedHere) Notifier.alert(app, text)
             }
             eventsInit = true
             list.reverse() // 최신이 위로
@@ -582,6 +584,12 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
     override fun setMode(mode: Int) {
         prefs.edit().putInt("mode", mode).apply()
         _settings.value = _settings.value.copy(mode = mode)
+    }
+
+    override fun setMemberAlert(memberId: String, on: Boolean) {
+        val next = if (on) _settings.value.muted - memberId else _settings.value.muted + memberId
+        prefs.edit().putStringSet("muted_ids", HashSet(next)).apply()
+        _settings.value = _settings.value.copy(muted = next)
     }
 
     override fun setShowPlaces(on: Boolean) {

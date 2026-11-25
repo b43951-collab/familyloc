@@ -45,6 +45,7 @@ class LocalFamilyRepository(context: Context) : FamilyRepository {
             distOn = prefs.getBoolean("dist_on", false),
             distM = prefs.getInt("dist_m", 1000),
             distTarget = prefs.getString("dist_target", "") ?: "",
+            muted = prefs.getStringSet("muted_ids", emptySet())?.toSet() ?: emptySet(),
         )
     )
     private val _places = MutableStateFlow(loadPlaces())
@@ -231,6 +232,12 @@ class LocalFamilyRepository(context: Context) : FamilyRepository {
     override fun setMode(mode: Int) {
         prefs.edit().putInt("mode", mode).apply()
         _settings.value = _settings.value.copy(mode = mode)
+    }
+
+    override fun setMemberAlert(memberId: String, on: Boolean) {
+        val next = if (on) _settings.value.muted - memberId else _settings.value.muted + memberId
+        prefs.edit().putStringSet("muted_ids", HashSet(next)).apply()
+        _settings.value = _settings.value.copy(muted = next)
     }
 
     override fun setShowPlaces(on: Boolean) {

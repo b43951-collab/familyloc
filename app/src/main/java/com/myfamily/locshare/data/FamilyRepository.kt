@@ -57,6 +57,8 @@ interface FamilyRepository {
     fun setShowPlaces(on: Boolean)
     fun setDistanceAlert(on: Boolean, meters: Int, targetId: String)
     fun setEmoji(emoji: String)
+    /** 이 가족의 도착/출발 알림을 이 폰에서 받을지 */
+    fun setMemberAlert(memberId: String, on: Boolean)
     fun sendSos()
     /** 분실 대응: type = RING | STOP | SAVER | NORMAL | TRACK */
     fun sendCommand(targetId: String, type: String)

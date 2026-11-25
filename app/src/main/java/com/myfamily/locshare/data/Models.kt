@@ -61,4 +61,6 @@ data class Settings(
     val distOn: Boolean = false,
     val distM: Int = 1000,
     val distTarget: String = "",
+    /** 도착/출발 알림을 받지 않을 가족 id (이 폰에서만 적용) */
+    val muted: Set<String> = emptySet(),
 )
