@@ -14,6 +14,7 @@ data class Member(
     val updatedAt: Long = 0L,
     val sharing: Boolean = true,
     val isMe: Boolean = false,
+    val emoji: String = "",
 )
 
 /** 장소 (집/학교/직장 등) - 도착/출발 알림의 기준 */
@@ -38,6 +39,7 @@ data class Profile(
     val name: String,
     val color: Long,
     val circleCode: String,
+    val emoji: String = "",
 )
 
 data class TrackPoint(
@@ -49,5 +51,11 @@ data class TrackPoint(
 data class Settings(
     val sharing: Boolean,
     val demo: Boolean,
-    val saver: Boolean,
+    /** 백그라운드 동작: 0 슈퍼 절전, 1 절전, 2 보통, 3 높은 정확도 */
+    val mode: Int = 2,
+    val showPlaces: Boolean = true,
+    /** 거리 알림(이 폰에서만 판정): 켬/끔, 기준 거리(m), 대상 멤버 id(빈 값이면 첫 가족) */
+    val distOn: Boolean = false,
+    val distM: Int = 1000,
+    val distTarget: String = "",
 )

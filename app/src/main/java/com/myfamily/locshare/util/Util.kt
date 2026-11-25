@@ -28,6 +28,17 @@ object Geo {
     }
 }
 
+object Status {
+    /** 직접 고른 이모지가 있으면 그것, 없으면 속도로 추정(이동 중 🚶/🚗). */
+    fun emoji(m: com.myfamily.locshare.data.Member): String = when {
+        m.emoji.isNotEmpty() -> m.emoji
+        !m.sharing -> ""
+        m.speedMps > 6f -> "🚗"
+        m.speedMps > 1.2f -> "🚶"
+        else -> ""
+    }
+}
+
 object Fmt {
     fun ago(t: Long, now: Long = System.currentTimeMillis()): String {
         if (t <= 0L) return "정보 없음"

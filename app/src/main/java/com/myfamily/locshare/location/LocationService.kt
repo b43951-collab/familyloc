@@ -20,6 +20,8 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.Priority
 import com.myfamily.locshare.data.FamilyRepository
 import com.myfamily.locshare.data.ServiceLocator
+import com.myfamily.locshare.util.Fmt
+import com.myfamily.locshare.util.Geo
 import com.myfamily.locshare.util.Perms
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -88,9 +90,12 @@ class LocationService : Service() {
         client = LocationServices.getFusedLocationProviderClient(this)
         Notifier.ensureChannels(this)
         scope.launch {
-            combine(viewing, repo.settings) { v, s -> v to s.saver }.collect {
+            combine(viewing, repo.settings) { v, s -> v to s.mode }.collect {
                 applyRequest()
             }
+        }
+        scope.launch {
+            repo.members.collect { checkDistance() }
         }
     }
 
@@ -122,7 +127,7 @@ class LocationService : Service() {
     }
 
     private fun applyRequest() {
-        val saver = repo.settings.value.saver
+        val mode = repo.settings.value.mode
         val boosting = SystemClock.elapsedRealtime() < boostUntil || viewing.value
         val interval: Long
         val priority: Int
@@ -130,11 +135,12 @@ class LocationService : Service() {
             interval = 5_000L
             priority = Priority.PRIORITY_HIGH_ACCURACY
         } else if (moving) {
-            interval = if (saver) 30_000L else 10_000L
+            // 0 슈퍼 절전 / 1 절전 / 2 보통 / 3 높은 정확도
+            interval = when (mode) { 0 -> 60_000L; 1 -> 30_000L; 3 -> 5_000L; else -> 10_000L }
             priority = Priority.PRIORITY_HIGH_ACCURACY
         } else {
-            interval = if (saver) 300_000L else 120_000L
-            priority = Priority.PRIORITY_BALANCED_POWER_ACCURACY
+            interval = when (mode) { 0 -> 600_000L; 1 -> 300_000L; 3 -> 30_000L; else -> 120_000L }
+            priority = if (mode == 3) Priority.PRIORITY_HIGH_ACCURACY else Priority.PRIORITY_BALANCED_POWER_ACCURACY
         }
         val key = "$interval/$priority"
         if (key == activeKey) return
@@ -178,7 +184,31 @@ class LocationService : Service() {
 
         val (pct, charging) = batteryInfo()
         repo.onMyLocation(loc.latitude, loc.longitude, loc.accuracy, speed, pct, charging, System.currentTimeMillis())
+        checkDistance()
         applyRequest()
+    }
+
+    private var farState = false
+
+    /** 거리 알림: 이 폰의 위치와 선택한 가족의 위치를 비교해서, 기준 거리를 넘으면 이 폰에 알림을 띄운다. */
+    private fun checkDistance() {
+        val s = repo.settings.value
+        if (!s.distOn) {
+            farState = false
+            return
+        }
+        val me = lastFix ?: return
+        val others = repo.members.value.filter { !it.isMe && it.sharing }
+        val target = others.firstOrNull { it.id == s.distTarget } ?: others.firstOrNull() ?: return
+        if (System.currentTimeMillis() - target.updatedAt > 30 * 60_000L) return // 오래된 위치는 무시
+        val d = Geo.distM(me.latitude, me.longitude, target.lat, target.lng)
+        val limit = s.distM.toDouble()
+        if (!farState && d > limit) {
+            farState = true
+            Notifier.alert(this, "${target.name} 님과 ${Fmt.distance(d)} 떨어졌어요")
+        } else if (farState && d < limit * 0.9) {
+            farState = false
+        }
     }
 
     private fun batteryInfo(): Pair<Int, Boolean> {

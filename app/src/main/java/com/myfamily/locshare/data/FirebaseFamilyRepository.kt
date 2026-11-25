@@ -70,13 +70,18 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
             name = prefs.getString("p_name", "나") ?: "나",
             color = prefs.getLong("p_color", 0xFF1E88E5),
             circleCode = "------",
+            emoji = prefs.getString("p_emoji", "") ?: "",
         )
     )
     private val _settings = MutableStateFlow(
         Settings(
             sharing = prefs.getBoolean("sharing", true),
             demo = false,
-            saver = prefs.getBoolean("saver", false),
+            mode = prefs.getInt("mode", if (prefs.getBoolean("saver", false)) 1 else 2),
+            showPlaces = prefs.getBoolean("show_places", true),
+            distOn = prefs.getBoolean("dist_on", false),
+            distM = prefs.getInt("dist_m", 1000),
+            distTarget = prefs.getString("dist_target", "") ?: "",
         )
     )
 
@@ -91,6 +96,7 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
     private var uid: String? = null
     private var cid: String? = null
     private val profiles = LinkedHashMap<String, Pair<String, Long>>() // uid -> (이름, 색)
+    private val emojis = HashMap<String, String>()
     private val locs = HashMap<String, Loc>()
     private var myLast: Loc? = null
     private var insideMe: Set<String>? = null
@@ -260,8 +266,10 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         // 멤버 프로필
         listen(db.getReference("circles/$c/members")) { s ->
             profiles.clear()
+            emojis.clear()
             for (ch in s.children) {
                 val k = ch.key ?: continue
+                emojis[k] = ch.child("emoji").value as? String ?: ""
                 val name = ch.child("name").value as? String ?: "?"
                 val color = (ch.child("color").value as? Number)?.toLong() ?: 0xFF1E88E5
                 profiles[k] = name to color
@@ -348,6 +356,7 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         for ((q, l) in listeners) q.removeEventListener(l)
         listeners.clear()
         profiles.clear()
+        emojis.clear()
         locs.clear()
         allEvents = emptyList()
         _members.value = emptyList()
@@ -376,10 +385,11 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
             val name = if (isMe) _profile.value.name else prof.first
             val color = if (isMe) _profile.value.color else prof.second
             val l: Loc? = if (isMe && _settings.value.sharing && ml != null) ml else locs[u]
+            val emo = if (isMe) _profile.value.emoji else (emojis[u] ?: "")
             if (l != null && l.sharing) {
-                out.add(Member(u, name, color, l.lat, l.lng, l.acc, l.spd, l.bat, l.chg, l.t, true, isMe))
+                out.add(Member(u, name, color, l.lat, l.lng, l.acc, l.spd, l.bat, l.chg, l.t, true, isMe, emo))
             } else {
-                out.add(Member(u, name, color, 0.0, 0.0, 0f, 0f, -1, false, l?.t ?: 0L, false, isMe))
+                out.add(Member(u, name, color, 0.0, 0.0, 0f, 0f, -1, false, l?.t ?: 0L, false, isMe, emo))
             }
         }
         _members.value = out
@@ -401,6 +411,7 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         myLast = Loc(lat, lng, accuracyM, speedMps, battery, charging, time, true)
         history.append(lat, lng, time)
         evaluateMe(lat, lng)
+        checkLowBattery(battery, charging)
         publish()
         if (!_settings.value.sharing) return
 
@@ -436,6 +447,19 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
             }
         }
         insideMe = cur
+    }
+
+    /** 배터리가 20% 이하로 떨어지면 가족에게 한 번 알린다. 충전하거나 30%를 넘으면 다시 준비. */
+    private fun checkLowBattery(b: Int, charging: Boolean) {
+        if (b < 0) return
+        if (charging || b >= 30) {
+            if (prefs.getBoolean("low_sent", false)) prefs.edit().putBoolean("low_sent", false).apply()
+            return
+        }
+        if (b <= 20 && !prefs.getBoolean("low_sent", false)) {
+            prefs.edit().putBoolean("low_sent", true).apply()
+            pushEvent("INFO", "${_profile.value.name} 님의 배터리가 ${b}% 남았어요")
+        }
     }
 
     private fun pushEvent(kind: String, text: String) {
@@ -505,9 +529,30 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         // 서버 모드에는 데모 가족이 없다
     }
 
-    override fun setSaver(on: Boolean) {
-        prefs.edit().putBoolean("saver", on).apply()
-        _settings.value = _settings.value.copy(saver = on)
+    override fun setMode(mode: Int) {
+        prefs.edit().putInt("mode", mode).apply()
+        _settings.value = _settings.value.copy(mode = mode)
+    }
+
+    override fun setShowPlaces(on: Boolean) {
+        prefs.edit().putBoolean("show_places", on).apply()
+        _settings.value = _settings.value.copy(showPlaces = on)
+    }
+
+    override fun setDistanceAlert(on: Boolean, meters: Int, targetId: String) {
+        prefs.edit().putBoolean("dist_on", on).putInt("dist_m", meters).putString("dist_target", targetId).apply()
+        _settings.value = _settings.value.copy(distOn = on, distM = meters, distTarget = targetId)
+    }
+
+    override fun setEmoji(emoji: String) {
+        prefs.edit().putString("p_emoji", emoji).apply()
+        _profile.value = _profile.value.copy(emoji = emoji)
+        val u = uid
+        val c = cid
+        if (u != null && c != null) {
+            db.getReference("circles/$c/members/$u/emoji").setValue(emoji)
+        }
+        publish()
     }
 
     override fun sendSos() {

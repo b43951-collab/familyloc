@@ -53,8 +53,8 @@ data class MapFocus(val lat: Double, val lng: Double, val zoom: Double?, val tok
 private val bmpCache = HashMap<String, Bitmap>()
 
 /** 지도 위에 올릴 가족 마커(색 동그라미 + 이름 첫 글자 + 꼬리) */
-fun avatarBitmap(ctx: Context, name: String, color: Long, selected: Boolean): Bitmap {
-    val key = "$name/$color/$selected"
+fun avatarBitmap(ctx: Context, name: String, color: Long, selected: Boolean, emoji: String = ""): Bitmap {
+    val key = "$name/$color/$selected/$emoji"
     bmpCache[key]?.let { return it }
 
     val d = ctx.resources.displayMetrics.density
@@ -87,6 +87,20 @@ fun avatarBitmap(ctx: Context, name: String, color: Long, selected: Boolean): Bi
     paint.textSize = size * 0.45f
     val y = r - (paint.ascent() + paint.descent()) / 2f
     c.drawText(name.take(1), r, y, paint)
+
+    // 상태 이모지 배지 (오른쪽 위)
+    if (emoji.isNotEmpty()) {
+        val br = 10 * d
+        val bx = size - br
+        val by = br
+        paint.color = android.graphics.Color.WHITE
+        c.drawCircle(bx, by, br, paint)
+        paint.color = android.graphics.Color.BLACK
+        paint.typeface = Typeface.DEFAULT
+        paint.textSize = 13 * d
+        val ey = by - (paint.ascent() + paint.descent()) / 2f
+        c.drawText(emoji, bx, ey, paint)
+    }
 
     bmpCache[key] = bmp
     return bmp
@@ -208,7 +222,7 @@ fun FamilyMapView(
 
         for (m in members) {
             if (!m.sharing) continue
-            val bmp = avatarBitmap(ctx, m.name, m.color, m.id == selectedId)
+            val bmp = avatarBitmap(ctx, m.name, m.color, m.id == selectedId, com.myfamily.locshare.util.Status.emoji(m))
             val style = LabelStyle.from(bmp)
                 .setAnchorPoint(0.5f, 1.0f)
                 .setApplyDpScale(false)

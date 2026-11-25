@@ -51,12 +51,14 @@ import com.myfamily.locshare.data.Place
 import com.myfamily.locshare.util.Fmt
 import com.myfamily.locshare.util.Geo
 import com.myfamily.locshare.util.Perms
+import com.myfamily.locshare.util.Status
 
 @Composable
 fun MapScreen(repo: FamilyRepository, tick: Int, onOpenSettings: () -> Unit) {
     val ctx = LocalContext.current
     val members by repo.members.collectAsState()
     val places by repo.places.collectAsState()
+    val settings by repo.settings.collectAsState()
     val now by rememberNow()
 
     var selectedId by remember { mutableStateOf<String?>(null) }
@@ -86,7 +88,7 @@ fun MapScreen(repo: FamilyRepository, tick: Int, onOpenSettings: () -> Unit) {
         FamilyMapView(
             modifier = Modifier.fillMaxSize(),
             members = members,
-            places = places,
+            places = if (settings.showPlaces) places else emptyList(),
             selectedId = selectedId,
             focus = focus,
             onMemberClick = { selectedId = it },
@@ -121,11 +123,18 @@ fun MapScreen(repo: FamilyRepository, tick: Int, onOpenSettings: () -> Unit) {
                             Avatar(m.name, m.color, 32.dp)
                             Spacer(Modifier.width(8.dp))
                             Column {
-                                Text(m.name, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                val emo = Status.emoji(m)
                                 Text(
-                                    Fmt.ago(m.updatedAt, now),
+                                    (if (emo.isNotEmpty()) "$emo " else "") + m.name,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                )
+                                val low = m.battery in 0..20 && !m.charging
+                                Text(
+                                    Fmt.ago(m.updatedAt, now) +
+                                        (if (m.sharing && m.battery >= 0) " · 🔋${m.battery}%" else ""),
                                     fontSize = 11.sp,
-                                    color = Color.Gray,
+                                    color = if (low) Color(0xFFD32F2F) else Color.Gray,
                                 )
                             }
                         }
@@ -230,7 +239,8 @@ private fun MemberCard(m: Member, places: List<Place>, now: Long, onClose: () ->
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        m.name + (if (m.isMe) " (나)" else ""),
+                        Status.emoji(m).let { if (it.isNotEmpty()) "$it " else "" } +
+                            m.name + (if (m.isMe) " (나)" else ""),
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp,
                     )

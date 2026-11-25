@@ -52,7 +52,10 @@ interface FamilyRepository {
     fun updateProfile(name: String, color: Long)
     fun setSharing(on: Boolean)
     fun setDemo(on: Boolean)
-    fun setSaver(on: Boolean)
+    fun setMode(mode: Int)
+    fun setShowPlaces(on: Boolean)
+    fun setDistanceAlert(on: Boolean, meters: Int, targetId: String)
+    fun setEmoji(emoji: String)
     fun sendSos()
     fun requestRefresh()
     fun history(fromMs: Long, toMs: Long): List<TrackPoint>

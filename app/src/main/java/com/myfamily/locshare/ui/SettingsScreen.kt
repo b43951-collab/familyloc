@@ -34,6 +34,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -60,6 +64,7 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
     val ctx = LocalContext.current
     val settings by repo.settings.collectAsState()
     val profile by repo.profile.collectAsState()
+    val members by repo.members.collectAsState()
 
     var bump by remember { mutableStateOf(0) }
     var confirm by remember { mutableStateOf(0) } // 1 = 서클 나가기, 2 = 로그아웃
@@ -167,8 +172,86 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
                     }
                     repo.setSharing(it)
                 }
-                SwitchRow("배터리 절약 모드", "수집 주기를 늘려 배터리를 아껴요 (실시간성은 조금 떨어짐)", settings.saver) {
-                    repo.setSaver(it)
+                SwitchRow("지도에 장소 원 표시", "등록한 장소(집, 학교 등)의 범위를 지도에 그려요", settings.showPlaces) {
+                    repo.setShowPlaces(it)
+                }
+            }
+        }
+
+        // ---------- 백그라운드 동작 ----------
+        item {
+            SectionCard("백그라운드 동작") {
+                Text(
+                    "앱을 보고 있을 땐 항상 실시간이에요. 아래는 화면을 끄고 있을 때의 위치 갱신 빈도예요.",
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                )
+                val modes = listOf(
+                    Triple(0, "슈퍼 배터리 절전", "이동 1분 · 정지 10분마다. 배터리를 가장 아껴요"),
+                    Triple(1, "배터리 절전", "이동 30초 · 정지 5분마다"),
+                    Triple(2, "보통 정확도", "이동 10초 · 정지 2분마다 (기본)"),
+                    Triple(3, "높은 정확도", "이동 5초 · 정지 30초마다. 배터리를 많이 써요"),
+                )
+                modes.forEach { (v, title, desc) ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { repo.setMode(v) }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = settings.mode == v, onClick = { repo.setMode(v) })
+                        Column(Modifier.weight(1f)) {
+                            Text(title, fontWeight = FontWeight.Medium)
+                            Text(desc, fontSize = 12.sp, color = Color.Gray)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---------- 거리 알림 ----------
+        item {
+            SectionCard("거리 알림") {
+                val others = members.filter { !it.isMe }
+                SwitchRow(
+                    "가족과 멀어지면 알림",
+                    "선택한 가족과 기준 거리보다 멀어지면 이 폰에 알림을 띄워요. (이 폰의 어디찌가 켜져 있어야 해요)",
+                    settings.distOn,
+                ) {
+                    val target = settings.distTarget.ifEmpty { others.firstOrNull()?.id ?: "" }
+                    repo.setDistanceAlert(it, settings.distM, target)
+                }
+                if (settings.distOn) {
+                    Text("기준 거리", fontSize = 12.sp, color = Color.Gray)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(500 to "500m", 1000 to "1km", 3000 to "3km", 5000 to "5km").forEach { (m, label) ->
+                            FilterChip(
+                                selected = settings.distM == m,
+                                onClick = { repo.setDistanceAlert(true, m, settings.distTarget) },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text("대상", fontSize = 12.sp, color = Color.Gray)
+                    if (others.isEmpty()) {
+                        Text("가족이 서클에 들어오면 고를 수 있어요", fontSize = 12.sp, color = Color.Gray)
+                    } else {
+                        val cur = settings.distTarget.ifEmpty { others.first().id }
+                        Row(
+                            Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            others.forEach { o ->
+                                FilterChip(
+                                    selected = cur == o.id,
+                                    onClick = { repo.setDistanceAlert(true, settings.distM, o.id) },
+                                    label = { Text(o.name) },
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -202,6 +285,20 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
                                     else Modifier
                                 )
                                 .clickable { repo.updateProfile(nameText, c) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Text("상태 이모지 (가족 지도에 이름 옆으로 표시돼요)", fontSize = 12.sp, color = Color.Gray)
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    listOf("", "😴", "🏠", "🏢", "🚗", "🍚", "📚", "💪", "🔕", "🤒").forEach { e ->
+                        FilterChip(
+                            selected = profile.emoji == e,
+                            onClick = { repo.setEmoji(e) },
+                            label = { Text(if (e.isEmpty()) "자동" else e) },
                         )
                     }
                 }

@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
@@ -16,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,6 +49,41 @@ private fun bounds(range: Int): Pair<Long, Long> {
         1 -> (todayStart - day) to todayStart
         else -> (todayStart - 6 * day) to Long.MAX_VALUE
     }
+}
+
+/** 한 번의 이동(여정). 움직임이 5분 이상 멈추면 끝난 것으로 본다. */
+private data class Trip(val start: Long, val end: Long, val distM: Double)
+
+private fun computeTrips(track: List<TrackPoint>): List<Trip> {
+    val out = ArrayList<Trip>()
+    var startT = -1L
+    var dist = 0.0
+    var lastMoveT = 0L
+    fun close() {
+        if (startT >= 0 && dist >= 100.0 && lastMoveT - startT >= 60_000L) out.add(Trip(startT, lastMoveT, dist))
+        startT = -1L
+        dist = 0.0
+    }
+    for (i in 1 until track.size) {
+        val a = track[i - 1]
+        val b = track[i]
+        val dt = (b.t - a.t) / 1000.0
+        if (dt <= 0.0) continue
+        val d = Geo.distM(a.lat, a.lng, b.lat, b.lng)
+        val moving = dt <= 600.0 && d >= 15.0 && d / dt >= 0.7
+        if (moving) {
+            if (startT < 0) {
+                startT = a.t
+                dist = 0.0
+            }
+            dist += d
+            lastMoveT = b.t
+        } else if (startT >= 0 && b.t - lastMoveT >= 5 * 60_000L) {
+            close()
+        }
+    }
+    close()
+    return out.reversed() // 최근 여정이 위로
 }
 
 private fun totalDistance(track: List<TrackPoint>): Double {
@@ -111,6 +150,40 @@ fun HistoryScreen(repo: FamilyRepository) {
                     fontSize = 11.sp,
                     color = Color.Gray,
                 )
+            }
+        }
+
+        val trips = remember(track) { computeTrips(track) }
+        if (trips.isNotEmpty()) {
+            var expanded by rememberSaveable { mutableStateOf(false) }
+            Card(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 12.dp, top = 8.dp)
+            ) {
+                Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("최근 여정 ${trips.size}건", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        if (trips.size > 2) {
+                            TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "접기" else "더 보기") }
+                        }
+                    }
+                    Column(
+                        Modifier
+                            .heightIn(max = 200.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        trips.take(if (expanded) 15 else 2).forEach { t ->
+                            val mins = ((t.end - t.start) / 60_000L).coerceAtLeast(1L)
+                            val speed = t.distM / ((t.end - t.start) / 1000.0)
+                            Text(
+                                "${if (speed >= 4.0) "🚗" else "🚶"}  ${Fmt.dateTime(t.start)} ~ ${Fmt.hm(t.end)} (${mins}분) · ${Fmt.distance(t.distM)}",
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
             }
         }
 

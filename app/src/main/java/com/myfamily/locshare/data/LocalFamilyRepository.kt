@@ -40,7 +40,11 @@ class LocalFamilyRepository(context: Context) : FamilyRepository {
         Settings(
             sharing = prefs.getBoolean("sharing", true),
             demo = prefs.getBoolean("demo", true),
-            saver = prefs.getBoolean("saver", false),
+            mode = prefs.getInt("mode", if (prefs.getBoolean("saver", false)) 1 else 2),
+            showPlaces = prefs.getBoolean("show_places", true),
+            distOn = prefs.getBoolean("dist_on", false),
+            distM = prefs.getInt("dist_m", 1000),
+            distTarget = prefs.getString("dist_target", "") ?: "",
         )
     )
     private val _places = MutableStateFlow(loadPlaces())
@@ -222,9 +226,27 @@ class LocalFamilyRepository(context: Context) : FamilyRepository {
         }
     }
 
-    override fun setSaver(on: Boolean) {
-        prefs.edit().putBoolean("saver", on).apply()
-        _settings.value = _settings.value.copy(saver = on)
+    override fun setMode(mode: Int) {
+        prefs.edit().putInt("mode", mode).apply()
+        _settings.value = _settings.value.copy(mode = mode)
+    }
+
+    override fun setShowPlaces(on: Boolean) {
+        prefs.edit().putBoolean("show_places", on).apply()
+        _settings.value = _settings.value.copy(showPlaces = on)
+    }
+
+    override fun setDistanceAlert(on: Boolean, meters: Int, targetId: String) {
+        prefs.edit().putBoolean("dist_on", on).putInt("dist_m", meters).putString("dist_target", targetId).apply()
+        _settings.value = _settings.value.copy(distOn = on, distM = meters, distTarget = targetId)
+    }
+
+    override fun setEmoji(emoji: String) {
+        prefs.edit().putString("p_emoji", emoji).apply()
+        synchronized(lock) {
+            _profile.value = _profile.value.copy(emoji = emoji)
+            publish()
+        }
     }
 
     override fun sendSos() {
