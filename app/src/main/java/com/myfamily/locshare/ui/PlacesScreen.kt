@@ -75,7 +75,7 @@ fun PlacesScreen(repo: FamilyRepository) {
 
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f)) {
-            OsmMapView(
+            FamilyMapView(
                 modifier = Modifier.fillMaxSize(),
                 members = members.filter { it.isMe },
                 places = places,

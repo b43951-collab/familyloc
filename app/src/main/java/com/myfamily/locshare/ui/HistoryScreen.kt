@@ -119,7 +119,7 @@ fun HistoryScreen(repo: FamilyRepository) {
                 .weight(1f)
                 .padding(top = 8.dp)
         ) {
-            OsmMapView(
+            FamilyMapView(
                 modifier = Modifier.fillMaxSize(),
                 members = members.filter { it.isMe },
                 places = places,

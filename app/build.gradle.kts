@@ -70,6 +70,6 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-database")
 
-    // 지도: OpenStreetMap (API 키 불필요)
-    implementation("org.osmdroid:osmdroid-android:6.1.20")
+    // 지도: 카카오맵 SDK v2 (네이티브 앱 키 필요)
+    implementation("com.kakao.maps.open:android:2.15.2")
 }

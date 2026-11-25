@@ -4,20 +4,14 @@ import android.app.Application
 import com.myfamily.locshare.data.FirebaseFamilyRepository
 import com.myfamily.locshare.data.ServiceLocator
 import com.myfamily.locshare.location.Notifier
-import org.osmdroid.config.Configuration
-import java.io.File
+import com.kakao.vectormap.KakaoMapSdk
+import com.myfamily.locshare.data.KakaoConfig
 
 class FamilyApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // 지도 타일 캐시를 앱 전용 폴더에 둠 (저장소 권한 불필요)
-        val base = File(cacheDir, "osmdroid")
-        Configuration.getInstance().apply {
-            userAgentValue = packageName
-            osmdroidBasePath = base
-            osmdroidTileCache = File(base, "tiles")
-        }
+        KakaoMapSdk.init(this, KakaoConfig.NATIVE_APP_KEY)
 
         Notifier.ensureChannels(this)
 

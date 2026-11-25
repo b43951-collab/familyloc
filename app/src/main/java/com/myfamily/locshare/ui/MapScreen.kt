@@ -83,7 +83,7 @@ fun MapScreen(repo: FamilyRepository, tick: Int, onOpenSettings: () -> Unit) {
     }
 
     Box(Modifier.fillMaxSize()) {
-        OsmMapView(
+        FamilyMapView(
             modifier = Modifier.fillMaxSize(),
             members = members,
             places = places,
