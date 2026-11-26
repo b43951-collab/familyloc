@@ -2,4 +2,8 @@
 <resources>
     <string name="app_name">어디찌?</string>
     <string name="widget_desc">가족 위치와 배터리를 한눈에</string>
+    <string name="widget_desc_s">가족 아이콘과 배터리 (2×1)</string>
+    <string name="widget_desc_m">가족 카드 가로 한 줄 (4×1)</string>
+    <string name="widget_desc_l">가족 목록: 장소·시간·배터리 (4×2)</string>
+    <string name="widget_desc_xl">가족 전체 목록 큰 화면 (4×4)</string>
 </resources>

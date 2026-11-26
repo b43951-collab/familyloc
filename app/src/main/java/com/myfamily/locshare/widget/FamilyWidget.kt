@@ -24,15 +24,18 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** 홈 화면 위젯: 가족 위치(장소 이름)·마지막 업데이트·배터리. 크기를 키우면 줄 수와 글자가 함께 커져요. */
-class FamilyWidget : AppWidgetProvider() {
+enum class WKind { S, M, L, XL }
+
+/** 홈 화면 위젯 4종(2×1 / 4×1 / 4×2 / 4×4). 위젯 실제 크기에 맞춰 개수·글자·표시 항목이 달라져요. */
+open class FamilyWidget : AppWidgetProvider() {
+    open val kind: WKind = WKind.L
 
     override fun onUpdate(ctx: Context, mgr: AppWidgetManager, ids: IntArray) {
-        for (id in ids) mgr.updateAppWidget(id, build(ctx, mgr.getAppWidgetOptions(id)))
+        for (id in ids) mgr.updateAppWidget(id, build(ctx, kind, mgr.getAppWidgetOptions(id)))
     }
 
     override fun onAppWidgetOptionsChanged(ctx: Context, mgr: AppWidgetManager, id: Int, newOptions: Bundle?) {
-        mgr.updateAppWidget(id, build(ctx, newOptions))
+        mgr.updateAppWidget(id, build(ctx, kind, newOptions))
     }
 
     companion object {
@@ -40,6 +43,15 @@ class FamilyWidget : AppWidgetProvider() {
         private const val KEY = "rows"
         private const val KEY_AT = "at"
         private var lastPush = 0L
+        private val classes = listOf(
+            FamilyWidget::class.java, WidgetS::class.java, WidgetM::class.java, WidgetXL::class.java,
+        )
+        private fun kindOf(c: Class<*>) = when (c) {
+            WidgetS::class.java -> WKind.S
+            WidgetM::class.java -> WKind.M
+            WidgetXL::class.java -> WKind.XL
+            else -> WKind.L
+        }
 
         /** 앱이 최신 가족 상태를 알려줄 때 호출. 30초에 한 번만 갱신해요. */
         fun push(ctx: Context, members: List<Member>, places: List<Place>) {
@@ -78,8 +90,10 @@ class FamilyWidget : AppWidgetProvider() {
         fun refresh(ctx: Context) {
             try {
                 val mgr = AppWidgetManager.getInstance(ctx)
-                val ids = mgr.getAppWidgetIds(ComponentName(ctx, FamilyWidget::class.java))
-                for (id in ids) mgr.updateAppWidget(id, build(ctx, mgr.getAppWidgetOptions(id)))
+                for (c in classes) {
+                    val ids = mgr.getAppWidgetIds(ComponentName(ctx, c))
+                    for (id in ids) mgr.updateAppWidget(id, build(ctx, kindOf(c), mgr.getAppWidgetOptions(id)))
+                }
             } catch (_: Exception) {
             }
         }
@@ -109,56 +123,103 @@ class FamilyWidget : AppWidgetProvider() {
             return bmp
         }
 
-        private fun build(ctx: Context, opts: Bundle?): RemoteViews {
-            val v = RemoteViews(ctx.packageName, R.layout.widget_family)
+        private class R0(
+            val name: String, val emo: String, val color: Int, val where: String,
+            val t: Long, val bat: Int, val chg: Boolean,
+        )
+
+        private fun parse(raw: String?): List<R0> = (raw?.split("\n")?.filter { it.isNotBlank() } ?: emptyList()).map { line ->
+            val p = line.split("\t")
+            R0(
+                p.getOrNull(0) ?: "", p.getOrNull(1) ?: "", p.getOrNull(2)?.toIntOrNull() ?: Color.GRAY,
+                p.getOrNull(3) ?: "", p.getOrNull(4)?.toLongOrNull() ?: 0L,
+                p.getOrNull(5)?.toIntOrNull() ?: -1, p.getOrNull(6) == "1",
+            )
+        }
+
+        private fun batText(r: R0) = if (r.bat >= 0) (if (r.chg) "⚡" else "🔋") + "${r.bat}%" else ""
+
+        private fun build(ctx: Context, kind: WKind, opts: Bundle?): RemoteViews {
             val sp = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-            val raw = sp.getString(KEY, null)
-            val rows = raw?.split("\n")?.filter { it.isNotBlank() } ?: emptyList()
-
-            // 위젯 크기에 맞춰 보여줄 줄 수와 줄 높이를 정한다
-            val hDp = opts?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)?.takeIf { it > 0 } ?: 110
-            val wDp = opts?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)?.takeIf { it > 0 } ?: 250
-            val avail = hDp - 40
-            val maxRows = (avail / 52).coerceIn(1, 8)
-            val n = minOf(rows.size, maxRows)
-            val rowH = if (n > 0) (avail / n).coerceIn(52, 96) else 52
-            val scale = 1f + (rowH - 52) / 90f   // 줄이 높아지면 글자도 같이 커짐
-            val pad = ((rowH - 52) / 2).coerceAtLeast(0)
+            val rows = parse(sp.getString(KEY, null))
             val d = ctx.resources.displayMetrics.density
-            val showAgo = wDp >= 150
+            val wDp = opts?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)?.takeIf { it > 0 }
+                ?: when (kind) { WKind.S -> 110; else -> 250 }
+            val hDp = opts?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)?.takeIf { it > 0 }
+                ?: when (kind) { WKind.S, WKind.M -> 40; WKind.L -> 110; WKind.XL -> 250 }
 
-            v.removeAllViews(R.id.w_list)
-            for (i in 0 until n) {
-                val p = rows[i].split("\t")
-                val name = p.getOrNull(0) ?: ""
-                val emo = p.getOrNull(1) ?: ""
-                val color = p.getOrNull(2)?.toIntOrNull() ?: Color.GRAY
-                val where = p.getOrNull(3) ?: ""
-                val t = p.getOrNull(4)?.toLongOrNull() ?: 0L
-                val bat = p.getOrNull(5)?.toIntOrNull() ?: -1
-                val chg = p.getOrNull(6) == "1"
-
-                val r = RemoteViews(ctx.packageName, R.layout.widget_row)
-                r.setImageViewBitmap(R.id.r_avatar, avatar(name, color, emo))
-                r.setTextViewText(R.id.r_name, name)
-                r.setTextViewTextSize(R.id.r_name, android.util.TypedValue.COMPLEX_UNIT_SP, 14f * scale)
-                val ago = if (t > 0) Fmt.ago(t) else ""
-                r.setTextViewText(R.id.r_sub, if (showAgo && ago.isNotEmpty()) "$where · $ago" else where)
-                r.setTextViewTextSize(R.id.r_sub, android.util.TypedValue.COMPLEX_UNIT_SP, 12f * scale)
-                if (bat >= 0) {
-                    r.setTextViewText(R.id.r_bat, (if (chg) "⚡" else "🔋") + "$bat%")
-                    r.setTextColor(R.id.r_bat, if (bat <= 20 && !chg) Color.parseColor("#D32F2F") else Color.parseColor("#374151"))
-                    r.setTextViewTextSize(R.id.r_bat, android.util.TypedValue.COMPLEX_UNIT_SP, 13f * scale)
+            val v: RemoteViews
+            if (kind == WKind.S || kind == WKind.M) {
+                v = RemoteViews(ctx.packageName, R.layout.widget_strip)
+                v.removeAllViews(R.id.w_list)
+                if (kind == WKind.S) {
+                    // 아이콘 + (장소 배터리) 세로 한 칸씩
+                    val n = minOf(rows.size, ((wDp - 12) / 44).coerceIn(1, 5))
+                    for (i in 0 until n) {
+                        val r = rows[i]
+                        val c = RemoteViews(ctx.packageName, R.layout.widget_col)
+                        c.setImageViewBitmap(R.id.c_avatar, avatar(r.name, r.color, r.emo))
+                        val short = if (r.where == "이동 중" || r.where == "밖" || r.where == "공유 꺼짐") r.where.take(3) else r.where
+                        c.setTextViewText(R.id.c_sub, if (r.bat >= 0) "$short ${r.bat}%" else short)
+                        if (r.bat in 0..20 && !r.chg) c.setTextColor(R.id.c_sub, Color.parseColor("#D32F2F"))
+                        v.addView(R.id.w_list, c)
+                    }
+                    v.setViewVisibility(R.id.w_empty, if (rows.isEmpty()) View.VISIBLE else View.GONE)
                 } else {
-                    r.setTextViewText(R.id.r_bat, "")
+                    // 가족 카드를 가로로 한 줄
+                    val n = minOf(rows.size, (wDp / 100).coerceIn(1, 4))
+                    for (i in 0 until n) {
+                        val r = rows[i]
+                        val c = RemoteViews(ctx.packageName, R.layout.widget_card)
+                        c.setImageViewBitmap(R.id.c_avatar, avatar(r.name, r.color, r.emo))
+                        c.setTextViewText(R.id.c_name, r.name)
+                        val bt = batText(r)
+                        c.setTextViewText(R.id.c_sub, if (bt.isNotEmpty()) "${r.where} · $bt" else r.where)
+                        v.addView(R.id.w_list, c)
+                    }
+                    v.setViewVisibility(R.id.w_empty, if (rows.isEmpty()) View.VISIBLE else View.GONE)
                 }
-                val pp = (pad * d).toInt()
-                r.setViewPadding(R.id.r_root, (8 * d).toInt(), (6 * d).toInt() + pp, (12 * d).toInt(), (6 * d).toInt() + pp)
-                v.addView(R.id.w_list, r)
+            } else {
+                v = RemoteViews(ctx.packageName, R.layout.widget_family)
+                val avail = hDp - 40
+                val maxRows = (avail / 52).coerceIn(1, 8)
+                val n = minOf(rows.size, maxRows)
+                val rowH = if (n > 0) (avail / n).coerceIn(52, 96) else 52
+                val scale = 1f + (rowH - 52) / 90f
+                val pad = ((rowH - 52) / 2).coerceAtLeast(0)
+                val wide = wDp >= 230
+                val sz = android.util.TypedValue.COMPLEX_UNIT_SP
+                v.removeAllViews(R.id.w_list)
+                for (i in 0 until n) {
+                    val r = rows[i]
+                    val c = RemoteViews(ctx.packageName, R.layout.widget_row)
+                    c.setImageViewBitmap(R.id.r_avatar, avatar(r.name, r.color, r.emo))
+                    c.setTextViewText(R.id.r_name, r.name)
+                    c.setTextViewTextSize(R.id.r_name, sz, 14f * scale)
+                    val ago = if (r.t > 0) Fmt.ago(r.t) else ""
+                    if (wide) {
+                        // 넓으면 장소·시간을 가운데 칸으로
+                        c.setViewVisibility(R.id.r_sub, View.GONE)
+                        c.setViewVisibility(R.id.r_mid, View.VISIBLE)
+                        c.setTextViewText(R.id.r_place, r.where)
+                        c.setTextViewText(R.id.r_ago, ago)
+                        c.setTextViewTextSize(R.id.r_place, sz, 14f * scale)
+                        c.setTextViewTextSize(R.id.r_ago, sz, 12f * scale)
+                    } else {
+                        c.setTextViewText(R.id.r_sub, if (ago.isNotEmpty()) "${r.where} · $ago" else r.where)
+                        c.setTextViewTextSize(R.id.r_sub, sz, 12f * scale)
+                    }
+                    c.setTextViewText(R.id.r_bat, batText(r))
+                    c.setTextColor(R.id.r_bat, if (r.bat in 0..20 && !r.chg) Color.parseColor("#D32F2F") else Color.parseColor("#374151"))
+                    c.setTextViewTextSize(R.id.r_bat, sz, 13f * scale)
+                    val pp = (pad * d).toInt()
+                    c.setViewPadding(R.id.r_root, (8 * d).toInt(), (6 * d).toInt() + pp, (12 * d).toInt(), (6 * d).toInt() + pp)
+                    v.addView(R.id.w_list, c)
+                }
+                v.setViewVisibility(R.id.w_empty, if (rows.isEmpty()) View.VISIBLE else View.GONE)
+                val at = sp.getLong(KEY_AT, 0L)
+                v.setTextViewText(R.id.w_time, if (at > 0) SimpleDateFormat("HH:mm", Locale.KOREA).format(Date(at)) + " 기준" else "")
             }
-            v.setViewVisibility(R.id.w_empty, if (rows.isEmpty()) View.VISIBLE else View.GONE)
-            val at = sp.getLong(KEY_AT, 0L)
-            v.setTextViewText(R.id.w_time, if (at > 0) SimpleDateFormat("HH:mm", Locale.KOREA).format(Date(at)) + " 기준" else "")
 
             val open = PendingIntent.getActivity(
                 ctx, 0, Intent(ctx, MainActivity::class.java),
@@ -169,3 +230,7 @@ class FamilyWidget : AppWidgetProvider() {
         }
     }
 }
+
+class WidgetS : FamilyWidget() { override val kind = WKind.S }
+class WidgetM : FamilyWidget() { override val kind = WKind.M }
+class WidgetXL : FamilyWidget() { override val kind = WKind.XL }
