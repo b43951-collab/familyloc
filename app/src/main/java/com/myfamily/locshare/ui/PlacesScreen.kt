@@ -185,7 +185,7 @@ fun PlacesScreen(repo: FamilyRepository) {
                         onClick = {
                             // 누르면 그 장소로 이동하면서 수정 모드
                             focus = MapFocus(p.lat, p.lng, 17.0, System.nanoTime())
-                            draft = Draft(p.id, p.name, p.kind, p.radiusM.toFloat().coerceIn(100f, 500f), p.shared)
+                            draft = Draft(p.id, p.name, p.kind, p.radiusM.toFloat().coerceIn(50f, 500f), p.shared)
                         },
                         onDelete = { deleteTarget = p },
                     )
@@ -235,8 +235,8 @@ private fun EditPanel(d: Draft, onCancel: () -> Unit, onSave: () -> Unit) {
                 Slider(
                     value = d.radius,
                     onValueChange = { d.radius = it },
-                    valueRange = 100f..500f,
-                    steps = 7,
+                    valueRange = 50f..500f,
+                    steps = 8,
                     modifier = Modifier.weight(1f),
                 )
             }
