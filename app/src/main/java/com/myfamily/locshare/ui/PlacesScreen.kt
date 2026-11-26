@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -163,10 +164,10 @@ fun PlacesScreen(repo: FamilyRepository) {
             )
         } else {
             Text(
-                "내 장소 (가족이 들어오고 나가면 알림)",
-                modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp),
+                "내 장소 ${places.size}곳 · 누르면 수정",
+                modifier = Modifier.padding(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 2.dp),
                 fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
+                fontSize = 12.sp,
             )
 
             if (places.isEmpty()) {
@@ -178,7 +179,7 @@ fun PlacesScreen(repo: FamilyRepository) {
                 )
             }
 
-            LazyColumn(Modifier.weight(0.8f)) {
+            LazyColumn(Modifier.heightIn(max = 150.dp)) {
                 items(places, key = { it.id }) { p ->
                     PlaceRow(
                         p,
@@ -263,7 +264,7 @@ private fun PlaceRow(p: Place, onClick: () -> Unit, onDelete: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(start = 16.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -273,14 +274,14 @@ private fun PlaceRow(p: Place, onClick: () -> Unit, onDelete: () -> Unit) {
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(p.name, fontWeight = FontWeight.Bold)
+            Text(p.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
             Text(
-                "${p.kind} · 반경 ${p.radiusM}m · " + (if (p.shared) "가족 공유" else "나만 보기"),
-                fontSize = 12.sp,
+                "${p.radiusM}m · " + (if (p.shared) "가족 공유" else "나만 보기"),
+                fontSize = 11.sp,
                 color = Color.Gray,
             )
         }
-        IconButton(onClick = onDelete) {
+        IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
             Icon(Icons.Default.Delete, contentDescription = "삭제")
         }
     }
