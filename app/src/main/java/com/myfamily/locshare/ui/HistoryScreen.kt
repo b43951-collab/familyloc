@@ -127,8 +127,8 @@ fun HistoryScreen(repo: FamilyRepository) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 12.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             labels.forEachIndexed { i, l ->
@@ -155,68 +155,56 @@ fun HistoryScreen(repo: FamilyRepository) {
             }
         }
 
+        val trips = remember(track) { computeTrips(track) }
+        var expanded by rememberSaveable { mutableStateOf(false) }
         Card(
             Modifier
                 .fillMaxWidth()
                 .padding(start = 12.dp, end = 12.dp, top = 4.dp)
         ) {
-            Column(Modifier.padding(12.dp)) {
-                Text(if (viewingMe) "내 이동 기록" else "${sel?.name} 이동 기록", fontWeight = FontWeight.Bold)
+            Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
                 if (track.isEmpty()) {
                     Text(
-                        "이 기간에 기록이 없어요. 위치 공유를 켜고 조금 움직이면 쌓여요.",
-                        fontSize = 13.sp,
-                        color = Color.Gray,
-                    )
-                } else {
-                    Text(
-                        "이동 거리 약 ${Fmt.distance(totalDistance(track))} · 기록 ${track.size}개",
-                        fontSize = 13.sp,
-                    )
-                    Text(
-                        "${Fmt.dateTime(track.first().t)} → ${Fmt.dateTime(track.last().t)}",
+                        if (viewingMe) "이 기간에 기록이 없어요. 위치 공유를 켜고 조금 움직이면 쌓여요."
+                        else "기록이 없어요. 상대 폰이 최신 버전이고 위치 공유가 켜져 있어야 쌓여요. (최근 7일 보관)",
                         fontSize = 12.sp,
                         color = Color.Gray,
                     )
-                }
-                if (!viewingMe) {
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            (if (viewingMe) "나" else "${sel?.name}") +
+                                " · ${Fmt.distance(totalDistance(track))} · 기록 ${track.size}개",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (trips.isNotEmpty()) {
+                            TextButton(onClick = { expanded = !expanded }) {
+                                Text(if (expanded) "여정 접기 ▴" else "여정 ${trips.size}건 ▾", fontSize = 13.sp)
+                            }
+                        }
+                    }
                     Text(
-                        "가족 기록은 상대 폰이 최신 버전이고 위치 공유가 켜져 있을 때 쌓여요. 최근 7일만 보관해요.",
+                        "${Fmt.dateTime(track.first().t)} → ${Fmt.dateTime(track.last().t)}",
                         fontSize = 11.sp,
                         color = Color.Gray,
                     )
-                }
-            }
-        }
-
-        val trips = remember(track) { computeTrips(track) }
-        if (trips.isNotEmpty()) {
-            var expanded by rememberSaveable { mutableStateOf(false) }
-            Card(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(start = 12.dp, end = 12.dp, top = 8.dp)
-            ) {
-                Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("최근 여정 ${trips.size}건", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        if (trips.size > 2) {
-                            TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "접기" else "더 보기") }
-                        }
-                    }
-                    Column(
-                        Modifier
-                            .heightIn(max = 200.dp)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        trips.take(if (expanded) 15 else 2).forEach { t ->
-                            val mins = ((t.end - t.start) / 60_000L).coerceAtLeast(1L)
-                            val speed = t.distM / ((t.end - t.start) / 1000.0)
-                            Text(
-                                "${if (speed >= 4.0) "🚗" else "🚶"}  ${Fmt.dateTime(t.start)} ~ ${Fmt.hm(t.end)} (${mins}분) · ${Fmt.distance(t.distM)}",
-                                fontSize = 13.sp,
-                                modifier = Modifier.padding(vertical = 2.dp),
-                            )
+                    if (expanded) {
+                        Column(
+                            Modifier
+                                .heightIn(max = 130.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            trips.take(15).forEach { t ->
+                                val mins = ((t.end - t.start) / 60_000L).coerceAtLeast(1L)
+                                val speed = t.distM / ((t.end - t.start) / 1000.0)
+                                Text(
+                                    "${if (speed >= 4.0) "🚗" else "🚶"}  ${Fmt.dateTime(t.start)} ~ ${Fmt.hm(t.end)} (${mins}분) · ${Fmt.distance(t.distM)}",
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(vertical = 2.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -226,7 +214,7 @@ fun HistoryScreen(repo: FamilyRepository) {
         Box(
             Modifier
                 .weight(1f)
-                .padding(top = 8.dp)
+                .padding(top = 4.dp)
         ) {
             FamilyMapView(
                 modifier = Modifier.fillMaxSize(),
