@@ -448,7 +448,8 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         val c = cid ?: return
         myLast = Loc(lat, lng, accuracyM, speedMps, battery, charging, time, true)
         val recorded = history.append(lat, lng, time)
-        evaluateMe(lat, lng, accuracyM)
+        if (speedMps >= 1.0f) lastMoveAt = time
+        evaluateMe(lat, lng, accuracyM, time)
         checkLowBattery(battery, charging)
         publish()
         if (!_settings.value.sharing) return
@@ -565,7 +566,9 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
      * 내가 장소에 들어가거나 나가면 알림 기록을 남긴다. (가족 각자의 폰이 자기 것을 판정)
      * 경계 GPS 흔들림 방지: 정확도 나쁜 위치 무시, 연속 2회 확인, 같은 장소 알림 쿨다운 1분.
      */
-    private fun evaluateMe(lat: Double, lng: Double, acc: Float) {
+    private var lastMoveAt = 0L
+
+    private fun evaluateMe(lat: Double, lng: Double, acc: Float, time: Long) {
         if (acc > 100f) return // 오차가 큰 위치는 도착/출발 판정에서 제외
         val ps = _places.value
         val prev = insideMe
@@ -585,7 +588,8 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
             val d = Geo.distM(lat, lng, p.lat, p.lng)
             val limit = if (was) p.radiusM + maxOf(30f, acc) else p.radiusM.toFloat()
             val raw = d <= limit
-            if (raw == was) {
+            // 최근 5분 안에 움직인 적이 없으면(가만히 있으면) GPS가 튀어도 도착/출발로 보지 않는다
+            if (raw == was || time - lastMoveAt > 5 * 60_000L) {
                 pending.remove(p.id)
                 continue
             }
@@ -597,7 +601,7 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
             pending.remove(p.id)
             if (raw) cur.add(p.id) else cur.remove(p.id)
             val last = lastEventAt[p.id] ?: 0L
-            if (now - last < 60_000L) continue // 쿨다운: 상태만 바꾸고 알림은 생략
+            if (now - last < 120_000L) continue // 쿨다운 2분: 상태만 바꾸고 알림은 생략
             lastEventAt[p.id] = now
             val arrive = "$who ${p.name}에 도착했어요"
             val leave = "$who ${p.name}에서 출발했어요"
