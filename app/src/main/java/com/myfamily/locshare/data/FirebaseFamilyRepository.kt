@@ -85,6 +85,7 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
             distM = prefs.getInt("dist_m", 1000),
             distTarget = prefs.getString("dist_target", "") ?: "",
             muted = prefs.getStringSet("muted_ids", emptySet())?.toSet() ?: emptySet(),
+            selfAlert = prefs.getBoolean("self_alert", false),
         )
     )
 
@@ -601,9 +602,9 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
             val arrive = "$who ${p.name}에 도착했어요"
             val leave = "$who ${p.name}에서 출발했어요"
             if (raw) {
-                if (p.shared) pushEvent("ARRIVE", arrive) else Notifier.alert(app, arrive)
+                if (p.shared) pushEvent("ARRIVE", arrive) else if (_settings.value.selfAlert) Notifier.alert(app, arrive)
             } else {
-                if (p.shared) pushEvent("LEAVE", leave) else Notifier.alert(app, leave)
+                if (p.shared) pushEvent("LEAVE", leave) else if (_settings.value.selfAlert) Notifier.alert(app, leave)
             }
         }
         insideMe = cur
@@ -639,7 +640,8 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         m["kind"] = kind
         m["uid"] = uid ?: ""
         db.getReference("circles/$c/events").push().setValue(m)
-        Notifier.alert(app, text) // 내 폰에도 알림 (다른 가족은 DB 변경을 감지해서 알림)
+        // 내 폰에도 알림 (다른 가족은 DB 변경을 감지해서 알림). 내 도착/출발은 설정에서 켠 경우만
+        if ((kind != "ARRIVE" && kind != "LEAVE") || _settings.value.selfAlert) Notifier.alert(app, text)
     }
 
     override fun updatePlace(id: String, name: String, lat: Double, lng: Double, radiusM: Int, kind: String, shared: Boolean) {
@@ -722,6 +724,11 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
     override fun setMode(mode: Int) {
         prefs.edit().putInt("mode", mode).apply()
         _settings.value = _settings.value.copy(mode = mode)
+    }
+
+    override fun setSelfAlert(on: Boolean) {
+        prefs.edit().putBoolean("self_alert", on).apply()
+        _settings.value = _settings.value.copy(selfAlert = on)
     }
 
     override fun setMemberAlert(memberId: String, on: Boolean) {

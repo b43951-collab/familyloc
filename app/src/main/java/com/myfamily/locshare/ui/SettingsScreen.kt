@@ -285,6 +285,7 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
                 if (others.isEmpty()) {
                     Text("가족이 서클에 들어오면 여기에 나타나요", fontSize = 12.sp, color = Color.Gray)
                 }
+                SwitchRow("나", "내 도착/출발 알림을 이 폰에서 받아요 (기본 꺼짐)", settings.selfAlert) { repo.setSelfAlert(it) }
                 others.forEach { o ->
                     SwitchRow(
                         o.name,

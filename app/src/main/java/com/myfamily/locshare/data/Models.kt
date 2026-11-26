@@ -63,4 +63,6 @@ data class Settings(
     val distTarget: String = "",
     /** 도착/출발 알림을 받지 않을 가족 id (이 폰에서만 적용) */
     val muted: Set<String> = emptySet(),
+    /** 내 도착/출발 알림을 이 폰에서 받을지 (기본 꺼짐) */
+    val selfAlert: Boolean = false,
 )
