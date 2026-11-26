@@ -30,7 +30,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -138,14 +138,12 @@ fun PlacesScreen(repo: FamilyRepository) {
                     .size(36.dp),
             )
             if (d == null) {
-                ExtendedFloatingActionButton(
+                SmallFloatingActionButton(
                     onClick = { draft = Draft(null, "", "기타", 150f, true) },
-                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                    text = { Text("지도 가운데에 장소 추가") },
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
+                        .align(Alignment.BottomEnd)
                         .padding(12.dp),
-                )
+                ) { Icon(Icons.Default.Add, contentDescription = "장소 추가") }
             }
         }
 
