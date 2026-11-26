@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">어디찌?</string>
+    <string name="widget_desc">가족 위치와 배터리를 한눈에</string>
 </resources>

@@ -400,6 +400,7 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         _members.value = emptyList()
         _places.value = emptyList()
         _events.value = emptyList()
+        com.myfamily.locshare.widget.FamilyWidget.clear(app)
         cid = null
         myLast = null
         insideMe = null
@@ -431,6 +432,7 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
             }
         }
         _members.value = out
+        com.myfamily.locshare.widget.FamilyWidget.push(app, out, _places.value)
     }
 
     // ---------------- 내 위치 / 장소 / 알림 ----------------
