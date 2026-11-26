@@ -59,10 +59,11 @@ fun Avatar(name: String, color: Long, size: Dp = 40.dp) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = name.take(1),
+            text = name.take(2),
             color = Color.White,
             fontWeight = FontWeight.Bold,
-            fontSize = (size.value * 0.42f).sp,
+            fontSize = (size.value * (if (name.length >= 2) 0.34f else 0.42f)).sp,
+            maxLines = 1,
         )
     }
 }

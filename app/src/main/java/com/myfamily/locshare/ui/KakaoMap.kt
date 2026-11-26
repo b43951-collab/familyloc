@@ -84,9 +84,9 @@ fun avatarBitmap(ctx: Context, name: String, color: Long, selected: Boolean, emo
     paint.color = android.graphics.Color.WHITE
     paint.textAlign = Paint.Align.CENTER
     paint.typeface = Typeface.DEFAULT_BOLD
-    paint.textSize = size * 0.45f
+    paint.textSize = size * (if (name.length >= 2) 0.34f else 0.45f)
     val y = r - (paint.ascent() + paint.descent()) / 2f
-    c.drawText(name.take(1), r, y, paint)
+    c.drawText(name.take(2), r, y, paint)
 
     // 상태 이모지 배지 (오른쪽 위)
     if (emoji.isNotEmpty()) {
