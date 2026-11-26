@@ -5,21 +5,46 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:padding="10dp">
 
-    <TextView
-        android:id="@+id/w_title"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="어디찌?"
-        android:textColor="#2962FF"
-        android:textSize="12sp"
-        android:textStyle="bold" />
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
 
-    <TextView android:id="@+id/w_r0" style="@style/WidgetRow" />
-    <TextView android:id="@+id/w_r1" style="@style/WidgetRow" />
-    <TextView android:id="@+id/w_r2" style="@style/WidgetRow" />
-    <TextView android:id="@+id/w_r3" style="@style/WidgetRow" />
-    <TextView android:id="@+id/w_r4" style="@style/WidgetRow" />
-    <TextView android:id="@+id/w_r5" style="@style/WidgetRow" />
+        <TextView
+            android:id="@+id/w_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📍 어디찌?"
+            android:textColor="#2962FF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/w_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#8A8F99"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/w_list"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+
+    <TextView
+        android:id="@+id/w_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="앱을 열어 로그인하면 가족 위치가 보여요"
+        android:textColor="#555555"
+        android:textSize="13sp"
+        android:visibility="gone" />
 </LinearLayout>
