@@ -1,5 +1,6 @@
 package com.myfamily.locshare.ui
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,7 +34,9 @@ import com.myfamily.locshare.data.TrackPoint
 import com.myfamily.locshare.util.Fmt
 import com.myfamily.locshare.util.Geo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 import java.util.Calendar
 
 private fun bounds(range: Int): Pair<Long, Long> {
@@ -102,9 +105,22 @@ fun HistoryScreen(repo: FamilyRepository) {
     var range by rememberSaveable { mutableStateOf(0) }
     var reload by rememberSaveable { mutableStateOf(0) }
 
-    val track by produceState(initialValue = emptyList<TrackPoint>(), range, reload) {
+    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    val me = members.firstOrNull { it.isMe }
+    val sel = members.firstOrNull { it.id == selectedId } ?: me
+    val viewingMe = sel == null || sel.isMe
+    val selKey = sel?.id ?: ""
+
+    val track by produceState(initialValue = emptyList<TrackPoint>(), range, reload, selKey) {
         val (from, to) = bounds(range)
-        value = withContext(Dispatchers.IO) { repo.history(from, to) }
+        value = emptyList()
+        value = if (viewingMe) {
+            withContext(Dispatchers.IO) { repo.history(from, to) }
+        } else {
+            suspendCancellableCoroutine { cont ->
+                repo.loadFamilyHistory(selKey, from, to) { if (cont.isActive) cont.resume(it) }
+            }
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -121,13 +137,31 @@ fun HistoryScreen(repo: FamilyRepository) {
             TextButton(onClick = { reload++ }) { Text("새로고침") }
         }
 
+        if (members.size > 1) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                members.forEach { m ->
+                    FilterChip(
+                        selected = m.id == sel?.id,
+                        onClick = { selectedId = m.id },
+                        label = { Text(if (m.isMe) "나" else m.name) },
+                    )
+                }
+            }
+        }
+
         Card(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp)
+                .padding(start = 12.dp, end = 12.dp, top = 4.dp)
         ) {
             Column(Modifier.padding(12.dp)) {
-                Text("내 이동 기록", fontWeight = FontWeight.Bold)
+                Text(if (viewingMe) "내 이동 기록" else "${sel?.name} 이동 기록", fontWeight = FontWeight.Bold)
                 if (track.isEmpty()) {
                     Text(
                         "이 기간에 기록이 없어요. 위치 공유를 켜고 조금 움직이면 쌓여요.",
@@ -145,11 +179,13 @@ fun HistoryScreen(repo: FamilyRepository) {
                         color = Color.Gray,
                     )
                 }
-                Text(
-                    "가족의 이동 기록은 서버 연동 후 볼 수 있어요.",
-                    fontSize = 11.sp,
-                    color = Color.Gray,
-                )
+                if (!viewingMe) {
+                    Text(
+                        "가족 기록은 상대 폰이 최신 버전이고 위치 공유가 켜져 있을 때 쌓여요. 최근 7일만 보관해요.",
+                        fontSize = 11.sp,
+                        color = Color.Gray,
+                    )
+                }
             }
         }
 
@@ -194,7 +230,7 @@ fun HistoryScreen(repo: FamilyRepository) {
         ) {
             FamilyMapView(
                 modifier = Modifier.fillMaxSize(),
-                members = members.filter { it.isMe },
+                members = members.filter { it.id == sel?.id },
                 places = places,
                 track = track,
                 fitTrack = true,

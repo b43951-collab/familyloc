@@ -52,6 +52,12 @@
           }
         },
 
+        "hist": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('circles').child($cid).child('members').child(auth.uid).exists()"
+          }
+        },
+
         "cmd": {
           "$uid": {
             ".write": "auth != null && root.child('circles').child($cid).child('members').child(auth.uid).exists()"

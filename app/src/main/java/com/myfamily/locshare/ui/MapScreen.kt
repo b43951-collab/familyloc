@@ -128,7 +128,8 @@ fun MapScreen(repo: FamilyRepository, tick: Int, onOpenSettings: () -> Unit) {
                         shape = RoundedCornerShape(24.dp),
                         shadowElevation = 4.dp,
                         color = if (m.id == selectedId) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surface,
+                        else Color.White.copy(alpha = 0.94f),
+                        border = if (m.id == selectedId) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
                         modifier = Modifier.clickable {
                             selectedId = m.id
                             if (m.sharing) focus = MapFocus(m.lat, m.lng, null, System.nanoTime())
@@ -249,9 +250,12 @@ private fun MemberCard(m: Member, places: List<Place>, now: Long, onClose: () ->
         "🔋 -"
     }
 
+    var findOpen by remember(m.id) { mutableStateOf(false) }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -289,23 +293,25 @@ private fun MemberCard(m: Member, places: List<Place>, now: Long, onClose: () ->
                 }
             }) { Text("지도앱으로 열기 / 길찾기") }
             if (!m.isMe) {
-                Spacer(Modifier.height(4.dp))
-                Text("폰 찾기", fontSize = 12.sp, color = Color.Gray)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(onClick = {
+                Spacer(Modifier.height(2.dp))
+                TextButton(onClick = { findOpen = !findOpen }) {
+                    Text(if (findOpen) "폰 찾기 접기 ▴" else "폰 찾기 · 벨 울리기 ▾")
+                }
+                if (findOpen) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Button(modifier = Modifier.weight(1f), onClick = {
                         onCommand(if (ringSent) "STOP" else "RING")
                         ringSent = !ringSent
                         Toast.makeText(ctx, if (ringSent) "벨을 울렸어요 (60초 뒤 자동 종료)" else "벨을 껐어요", Toast.LENGTH_SHORT).show()
-                    }) { Text(if (ringSent) "🔕 벨 끄기" else "📣 벨 울리기", fontSize = 12.sp) }
-                    OutlinedButton(onClick = {
+                    }) { Text(if (ringSent) "벨 끄기" else "벨 울리기", fontSize = 12.sp, maxLines = 1) }
+                    OutlinedButton(modifier = Modifier.weight(1f), onClick = {
                         onCommand("TRACK")
                         Toast.makeText(ctx, "10분간 5초마다 위치를 받아요", Toast.LENGTH_SHORT).show()
-                    }) { Text("📍 실시간", fontSize = 12.sp) }
-                    OutlinedButton(onClick = {
+                    }) { Text("실시간", fontSize = 12.sp, maxLines = 1) }
+                    OutlinedButton(modifier = Modifier.weight(1f), onClick = {
                         onCommand(if (saverSent) "NORMAL" else "SAVER")
                         saverSent = !saverSent
                         Toast.makeText(ctx, if (saverSent) "상대 폰을 슈퍼 절전으로 바꿨어요" else "보통 모드로 되돌렸어요", Toast.LENGTH_SHORT).show()
-                    }) { Text(if (saverSent) "🔋 보통" else "🔋 절전", fontSize = 12.sp) }
+                    }) { Text(if (saverSent) "보통모드" else "절전모드", fontSize = 12.sp, maxLines = 1) }
                 }
             }
         }

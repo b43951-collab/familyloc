@@ -49,6 +49,7 @@ interface FamilyRepository {
 
     fun addPlace(name: String, lat: Double, lng: Double, radiusM: Int, kind: String, shared: Boolean)
     fun setPlaceShared(id: String, shared: Boolean)
+    fun updatePlace(id: String, name: String, lat: Double, lng: Double, radiusM: Int, kind: String, shared: Boolean)
     fun removePlace(id: String)
     fun updateProfile(name: String, color: Long)
     fun setSharing(on: Boolean)
@@ -64,6 +65,8 @@ interface FamilyRepository {
     fun sendCommand(targetId: String, type: String)
     fun requestRefresh()
     fun history(fromMs: Long, toMs: Long): List<TrackPoint>
+    /** 가족 구성원의 이동 기록 (서버). 결과는 메인 스레드 콜백으로 온다. */
+    fun loadFamilyHistory(memberId: String, fromMs: Long, toMs: Long, onResult: (List<TrackPoint>) -> Unit)
     fun clearEvents()
 }
 

@@ -103,191 +103,6 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // ---------- 권한 · 절전 ----------
-        item {
-            SectionCard("권한 · 절전 설정 (삼성 갤럭시 필수)") {
-                PermRow(
-                    "위치 권한", "앱을 사용하는 동안 내 위치 사용", fine, "허용",
-                ) {
-                    fineLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION,
-                        )
-                    )
-                }
-                PermRow(
-                    "항상 허용", "앱을 꺼도 위치 공유 (권한 → 위치 → '항상 허용' 선택)", bg, "설정 열기",
-                ) {
-                    if (!fine) {
-                        Toast.makeText(ctx, "먼저 위치 권한을 허용해 주세요", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(ctx, "권한 → 위치 → '항상 허용'을 선택해 주세요", Toast.LENGTH_LONG).show()
-                        open(appDetails())
-                    }
-                }
-                PermRow(
-                    "알림 권한", "도착/출발·SOS 알림 받기", noti, "허용",
-                ) {
-                    if (Build.VERSION.SDK_INT >= 33) {
-                        notiLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                }
-                PermRow(
-                    "배터리 '제한 없음'", "절전 때문에 앱이 꺼지는 것을 방지", batt, "설정",
-                ) {
-                    open(
-                        Intent(
-                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                            Uri.parse("package:${ctx.packageName}")
-                        )
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "갤럭시는 절전이 강해서 아래도 꼭 확인하세요 (One UI 버전에 따라 이름이 조금 달라요)\n" +
-                        "• 설정 → 배터리 → 백그라운드 사용 제한 → '사용하지 않는 앱 절전 전환' 끄기\n" +
-                        "• 같은 메뉴의 '절전 상태로 전환되지 않는 앱'에 이 앱 추가\n" +
-                        "• 설정 → 앱 → 어디찌? → 배터리 → '제한 없음'\n" +
-                        "• 최근 앱 화면에서 이 앱 아이콘을 눌러 '잠금 유지' (위로 밀어 닫지 않기)",
-                    fontSize = 12.sp,
-                    color = Color.DarkGray,
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { open(appDetails()) }) { Text("앱 정보 열기") }
-                    OutlinedButton(onClick = {
-                        open(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-                    }) { Text("배터리 최적화 목록") }
-                }
-            }
-        }
-
-        // ---------- 공유 옵션 ----------
-        item {
-            SectionCard("위치 공유") {
-                SwitchRow("내 위치 공유", "끄면 가족에게 내 위치가 보이지 않아요", settings.sharing) {
-                    if (it && !Perms.fine(ctx)) {
-                        Toast.makeText(ctx, "먼저 위치 권한을 허용해 주세요", Toast.LENGTH_SHORT).show()
-                    }
-                    repo.setSharing(it)
-                }
-                SwitchRow("지도에 장소 원 표시", "등록한 장소(집, 학교 등)의 범위를 지도에 그려요", settings.showPlaces) {
-                    repo.setShowPlaces(it)
-                }
-            }
-        }
-
-        // ---------- 백그라운드 동작 ----------
-        item {
-            SectionCard("백그라운드 동작") {
-                Text(
-                    "앱을 보고 있을 땐 항상 실시간이에요. 아래는 화면을 끄고 있을 때의 위치 갱신 빈도예요.",
-                    fontSize = 12.sp,
-                    color = Color.Gray,
-                )
-                val modes = listOf(
-                    Triple(0, "슈퍼 배터리 절전", "이동 1분 · 정지 10분마다. 배터리를 가장 아껴요"),
-                    Triple(1, "배터리 절전", "이동 30초 · 정지 5분마다"),
-                    Triple(2, "보통 정확도", "이동 10초 · 정지 2분마다 (기본)"),
-                    Triple(3, "높은 정확도", "이동 5초 · 정지 30초마다. 배터리를 많이 써요"),
-                )
-                modes.forEach { (v, title, desc) ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { repo.setMode(v) }
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = settings.mode == v, onClick = { repo.setMode(v) })
-                        Column(Modifier.weight(1f)) {
-                            Text(title, fontWeight = FontWeight.Medium)
-                            Text(desc, fontSize = 12.sp, color = Color.Gray)
-                        }
-                    }
-                }
-                OutlinedButton(onClick = {
-                    try {
-                        val i = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
-                            .putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName)
-                            .putExtra(Settings.EXTRA_CHANNEL_ID, "sharing_min")
-                        ctx.startActivity(i)
-                    } catch (e: Exception) {
-                        Toast.makeText(ctx, "설정 화면을 열 수 없어요", Toast.LENGTH_SHORT).show()
-                    }
-                }) { Text("위치 공유 알림 숨기기 (설정 열기)") }
-            }
-        }
-
-        // ---------- 도착/출발 알림 대상 ----------
-        item {
-            SectionCard("도착/출발 알림 받을 가족") {
-                val others = members.filter { !it.isMe }
-                Text(
-                    "끈 가족이 장소에 들어오거나 나가도 이 폰에는 알림이 뜨지 않아요. (SOS는 항상 와요)",
-                    fontSize = 12.sp,
-                    color = Color.Gray,
-                )
-                if (others.isEmpty()) {
-                    Text("가족이 서클에 들어오면 여기에 나타나요", fontSize = 12.sp, color = Color.Gray)
-                }
-                others.forEach { o ->
-                    SwitchRow(
-                        o.name,
-                        if (o.id in settings.muted) "알림 꺼짐" else "알림 켜짐",
-                        o.id !in settings.muted,
-                    ) { repo.setMemberAlert(o.id, it) }
-                }
-            }
-        }
-
-        // ---------- 거리 알림 ----------
-        item {
-            SectionCard("거리 알림") {
-                val others = members.filter { !it.isMe }
-                SwitchRow(
-                    "가족과 멀어지면 알림",
-                    "선택한 가족과 기준 거리보다 멀어지면 이 폰에 알림을 띄워요. (이 폰의 어디찌가 켜져 있어야 해요)",
-                    settings.distOn,
-                ) {
-                    val target = settings.distTarget.ifEmpty { others.firstOrNull()?.id ?: "" }
-                    repo.setDistanceAlert(it, settings.distM, target)
-                }
-                if (settings.distOn) {
-                    Text("기준 거리", fontSize = 12.sp, color = Color.Gray)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf(500 to "500m", 1000 to "1km", 3000 to "3km", 5000 to "5km").forEach { (m, label) ->
-                            FilterChip(
-                                selected = settings.distM == m,
-                                onClick = { repo.setDistanceAlert(true, m, settings.distTarget) },
-                                label = { Text(label) },
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text("대상", fontSize = 12.sp, color = Color.Gray)
-                    if (others.isEmpty()) {
-                        Text("가족이 서클에 들어오면 고를 수 있어요", fontSize = 12.sp, color = Color.Gray)
-                    } else {
-                        val cur = settings.distTarget.ifEmpty { others.first().id }
-                        Row(
-                            Modifier.horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            others.forEach { o ->
-                                FilterChip(
-                                    selected = cur == o.id,
-                                    onClick = { repo.setDistanceAlert(true, settings.distM, o.id) },
-                                    label = { Text(o.name) },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         // ---------- 프로필 ----------
         item {
             SectionCard("내 프로필") {
@@ -342,6 +157,201 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
             }
         }
 
+        // ---------- 권한 · 절전 ----------
+        item {
+            SectionCard("권한 · 절전 설정 (삼성 갤럭시 필수)") {
+              val allOk = fine && bg && noti && batt
+              var permOpen by remember { mutableStateOf(false) }
+              if (allOk && !permOpen) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("✅ 모든 권한이 정상이에요", modifier = Modifier.weight(1f))
+                    TextButton(onClick = { permOpen = true }) { Text("자세히") }
+                }
+              } else {
+                PermRow(
+                    "위치 권한", "앱을 사용하는 동안 내 위치 사용", fine, "허용",
+                ) {
+                    fineLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                        )
+                    )
+                }
+                PermRow(
+                    "항상 허용", "앱을 꺼도 위치 공유 (권한 → 위치 → '항상 허용' 선택)", bg, "설정 열기",
+                ) {
+                    if (!fine) {
+                        Toast.makeText(ctx, "먼저 위치 권한을 허용해 주세요", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(ctx, "권한 → 위치 → '항상 허용'을 선택해 주세요", Toast.LENGTH_LONG).show()
+                        open(appDetails())
+                    }
+                }
+                PermRow(
+                    "알림 권한", "도착/출발·SOS 알림 받기", noti, "허용",
+                ) {
+                    if (Build.VERSION.SDK_INT >= 33) {
+                        notiLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }
+                PermRow(
+                    "배터리 '제한 없음'", "절전 때문에 앱이 꺼지는 것을 방지", batt, "설정",
+                ) {
+                    open(
+                        Intent(
+                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                            Uri.parse("package:${ctx.packageName}")
+                        )
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "갤럭시는 절전이 강해서 아래도 꼭 확인하세요 (One UI 버전에 따라 이름이 조금 달라요)\n" +
+                        "• 설정 → 배터리 → 백그라운드 사용 제한 → '사용하지 않는 앱 절전 전환' 끄기\n" +
+                        "• 같은 메뉴의 '절전 상태로 전환되지 않는 앱'에 이 앱 추가\n" +
+                        "• 설정 → 앱 → 어디찌? → 배터리 → '제한 없음'\n" +
+                        "• 최근 앱 화면에서 이 앱 아이콘을 눌러 '잠금 유지' (위로 밀어 닫지 않기)",
+                    fontSize = 12.sp,
+                    color = Color.DarkGray,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { open(appDetails()) }) { Text("앱 정보 열기") }
+                    OutlinedButton(onClick = {
+                        open(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                    }) { Text("배터리 최적화 목록") }
+                }
+              }
+            }
+        }
+
+        // ---------- 공유 옵션 ----------
+        item {
+            SectionCard("위치 공유") {
+                SwitchRow("내 위치 공유", "끄면 가족에게 내 위치가 보이지 않아요", settings.sharing) {
+                    if (it && !Perms.fine(ctx)) {
+                        Toast.makeText(ctx, "먼저 위치 권한을 허용해 주세요", Toast.LENGTH_SHORT).show()
+                    }
+                    repo.setSharing(it)
+                }
+                SwitchRow("지도에 장소 원 표시", "등록한 장소(집, 학교 등)의 범위를 지도에 그려요", settings.showPlaces) {
+                    repo.setShowPlaces(it)
+                }
+            }
+        }
+
+        // ---------- 백그라운드 동작 ----------
+        item {
+            SectionCard("백그라운드 동작") {
+                Text(
+                    "앱을 보고 있을 땐 항상 실시간이에요. 아래는 화면을 끄고 있을 때의 위치 갱신 빈도예요.",
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                )
+                val modes = listOf(
+                    Triple(0, "슈퍼 배터리 절전", "이동 1분 · 정지 10분마다. 배터리를 가장 아껴요"),
+                    Triple(1, "배터리 절전", "이동 30초 · 정지 5분마다"),
+                    Triple(2, "보통 정확도", "이동 10초 · 정지 2분마다 (기본)"),
+                    Triple(3, "높은 정확도", "이동 5초 · 정지 30초마다. 배터리를 많이 써요"),
+                )
+                modes.forEach { (v, title, desc) ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { repo.setMode(v) }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = settings.mode == v, onClick = { repo.setMode(v) })
+                        Column(Modifier.weight(1f)) {
+                            Text(title, fontWeight = FontWeight.Medium)
+                            Text(desc, fontSize = 12.sp, color = Color.Gray)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---------- 도착/출발 알림 대상 ----------
+        item {
+            SectionCard("알림") {
+                val others = members.filter { !it.isMe }
+                Text(
+                    "도착/출발 알림을 받을 가족을 고르세요. 끈 가족은 이 폰에 알림이 뜨지 않아요. (SOS는 항상 와요)",
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                )
+                if (others.isEmpty()) {
+                    Text("가족이 서클에 들어오면 여기에 나타나요", fontSize = 12.sp, color = Color.Gray)
+                }
+                others.forEach { o ->
+                    SwitchRow(
+                        o.name,
+                        if (o.id in settings.muted) "알림 꺼짐" else "알림 켜짐",
+                        o.id !in settings.muted,
+                    ) { repo.setMemberAlert(o.id, it) }
+                }
+                Spacer(Modifier.height(6.dp))
+                OutlinedButton(onClick = {
+                    try {
+                        val i = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                            .putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName)
+                            .putExtra(Settings.EXTRA_CHANNEL_ID, "sharing_min")
+                        ctx.startActivity(i)
+                    } catch (e: Exception) {
+                        Toast.makeText(ctx, "설정 화면을 열 수 없어요", Toast.LENGTH_SHORT).show()
+                    }
+                }) { Text("위치 공유 알림 숨기기 (설정 열기)") }
+            }
+        }
+
+        // ---------- 거리 알림 ----------
+        item {
+            SectionCard("거리 알림") {
+                val others = members.filter { !it.isMe }
+                SwitchRow(
+                    "가족과 멀어지면 알림",
+                    "선택한 가족과 기준 거리보다 멀어지면 이 폰에 알림을 띄워요. (이 폰의 어디찌가 켜져 있어야 해요)",
+                    settings.distOn,
+                ) {
+                    val target = settings.distTarget.ifEmpty { others.firstOrNull()?.id ?: "" }
+                    repo.setDistanceAlert(it, settings.distM, target)
+                }
+                if (settings.distOn) {
+                    Text("기준 거리", fontSize = 12.sp, color = Color.Gray)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(500 to "500m", 1000 to "1km", 3000 to "3km", 5000 to "5km").forEach { (m, label) ->
+                            FilterChip(
+                                selected = settings.distM == m,
+                                onClick = { repo.setDistanceAlert(true, m, settings.distTarget) },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text("대상", fontSize = 12.sp, color = Color.Gray)
+                    if (others.isEmpty()) {
+                        Text("가족이 서클에 들어오면 고를 수 있어요", fontSize = 12.sp, color = Color.Gray)
+                    } else {
+                        val cur = settings.distTarget.ifEmpty { others.first().id }
+                        Row(
+                            Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            others.forEach { o ->
+                                FilterChip(
+                                    selected = cur == o.id,
+                                    onClick = { repo.setDistanceAlert(true, settings.distM, o.id) },
+                                    label = { Text(o.name) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // ---------- 가족 서클 ----------
         item {
             SectionCard("가족 서클") {
@@ -366,7 +376,7 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { confirm = 1 }) { Text("서클 나가기") }
-                        OutlinedButton(onClick = { confirm = 2 }) { Text("로그아웃") }
+                        OutlinedButton(onClick = { confirm = 2 }) { Text("로그아웃", color = Color(0xFFD32F2F)) }
                     }
                 }
             }
@@ -374,7 +384,7 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
 
         // ---------- 데모 / 정보 ----------
         item {
-            SectionCard("체험 · 정보") {
+            SectionCard("앱 정보") {
                 if (repo.supportsDemo) SwitchRow(
                     "데모 가족 표시",
                     "서버 없이도 가족 기능을 체험할 수 있게 가짜 가족(엄마·아빠·동생)이 내 주변을 돌아다녀요",
@@ -388,7 +398,7 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
                 ) { Text("업데이트 확인 (현재 빌드 ${com.myfamily.locshare.util.UpdateManager.installedBuild(updCtx)})") }
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    (if (repo.supportsDemo) "어디찌? v0.1 · 로컬 전용(서버 미연동)" else "어디찌? v0.1 · Firebase 서버 연동") +
+                    (if (repo.supportsDemo) "어디찌? 빌드 ${com.myfamily.locshare.util.UpdateManager.installedBuild(updCtx)} · 로컬 전용" else "어디찌? 빌드 ${com.myfamily.locshare.util.UpdateManager.installedBuild(updCtx)} · 가족 서버 연동") +
                         "\n지도: 카카오맵",
                     fontSize = 12.sp,
                     color = Color.Gray,

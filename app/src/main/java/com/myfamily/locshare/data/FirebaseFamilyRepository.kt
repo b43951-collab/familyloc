@@ -446,8 +446,8 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         val u = uid ?: return
         val c = cid ?: return
         myLast = Loc(lat, lng, accuracyM, speedMps, battery, charging, time, true)
-        history.append(lat, lng, time)
-        evaluateMe(lat, lng)
+        val recorded = history.append(lat, lng, time)
+        evaluateMe(lat, lng, accuracyM)
         checkLowBattery(battery, charging)
         publish()
         if (!_settings.value.sharing) return
@@ -462,31 +462,155 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         m["sharing"] = true
         m["t"] = ServerValue.TIMESTAMP
         db.getReference("circles/$c/loc/$u").setValue(m)
+
+        if (recorded) {
+            histBuf.add(TrackPoint(time, lat, lng))
+            flushHistory(c, u, false)
+        }
     }
 
-    /** 내가 장소에 들어가거나 나가면 알림 기록을 남긴다. (가족 각자의 폰이 자기 것을 판정) */
-    private fun evaluateMe(lat: Double, lng: Double) {
+    // ---------------- 이동 기록 서버 업로드 (최근 7일, 가족이 볼 수 있음) ----------------
+
+    private val histBuf = ArrayList<TrackPoint>()
+    private var lastFlush = 0L
+
+    private fun dayKey(t: Long): String =
+        java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date(t))
+
+    private fun putPoints(map: HashMap<String, Any>, pts: List<TrackPoint>) {
+        for (p in pts) {
+            map["${dayKey(p.t)}/${p.t}"] = String.format(java.util.Locale.US, "%.5f,%.5f", p.lat, p.lng)
+        }
+    }
+
+    private fun flushHistory(c: String, u: String, force: Boolean) {
+        val now = System.currentTimeMillis()
+        if (!force && histBuf.size < 10 && now - lastFlush < 5 * 60_000L) return
+        val ref = db.getReference("circles/$c/hist/$u")
+        val m = HashMap<String, Any>()
+
+        // 처음 한 번: 이 폰에 쌓인 최근 7일 기록도 올린다
+        val bfKey = "hist_bf_$c"
+        if (!prefs.getBoolean(bfKey, false)) {
+            prefs.edit().putBoolean(bfKey, true).apply()
+            val old = history.read(now - 7L * 24 * 3600 * 1000, Long.MAX_VALUE)
+            putPoints(m, if (old.size > 3000) old.takeLast(3000) else old)
+        }
+        if (histBuf.isNotEmpty()) {
+            putPoints(m, histBuf)
+            histBuf.clear()
+        }
+        lastFlush = now
+        if (m.isNotEmpty()) ref.updateChildren(m)
+
+        // 8일 지난 기록 정리 (하루 한 번)
+        if (now - prefs.getLong("hist_pruned", 0L) > 12 * 3600_000L) {
+            prefs.edit().putLong("hist_pruned", now).apply()
+            for (i in 8..14) ref.child(dayKey(now - i * 24L * 3600 * 1000)).removeValue()
+        }
+    }
+
+    override fun loadFamilyHistory(memberId: String, fromMs: Long, toMs: Long, onResult: (List<TrackPoint>) -> Unit) {
+        val c = cid
+        if (c == null) {
+            onResult(emptyList())
+            return
+        }
+        val end = minOf(toMs, System.currentTimeMillis() + 1)
+        val days = ArrayList<String>()
+        val cal = java.util.Calendar.getInstance()
+        cal.timeInMillis = fromMs
+        while (cal.timeInMillis < end && days.size < 8) {
+            days.add(dayKey(cal.timeInMillis))
+            cal.add(java.util.Calendar.DAY_OF_YEAR, 1)
+        }
+        if (days.isEmpty()) {
+            onResult(emptyList())
+            return
+        }
+        val out = ArrayList<TrackPoint>()
+        var left = days.size
+        fun done() {
+            left--
+            if (left == 0) {
+                out.sortBy { it.t }
+                onResult(out)
+            }
+        }
+        for (day in days) {
+            db.getReference("circles/$c/hist/$memberId/$day")
+                .addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        for (ch in snapshot.children) {
+                            val t = ch.key?.toLongOrNull() ?: continue
+                            if (t < fromMs || t >= toMs) continue
+                            val v = (ch.value as? String)?.split(",") ?: continue
+                            if (v.size != 2) continue
+                            val la = v[0].toDoubleOrNull() ?: continue
+                            val ln = v[1].toDoubleOrNull() ?: continue
+                            out.add(TrackPoint(t, la, ln))
+                        }
+                        done()
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {
+                        done()
+                    }
+                })
+        }
+    }
+
+    /**
+     * 내가 장소에 들어가거나 나가면 알림 기록을 남긴다. (가족 각자의 폰이 자기 것을 판정)
+     * 경계 GPS 흔들림 방지: 정확도 나쁜 위치 무시, 연속 2회 확인, 같은 장소 알림 쿨다운 1분.
+     */
+    private fun evaluateMe(lat: Double, lng: Double, acc: Float) {
+        if (acc > 100f) return // 오차가 큰 위치는 도착/출발 판정에서 제외
         val ps = _places.value
         val prev = insideMe
-        val cur = HashSet<String>()
-        for (p in ps) {
-            val was = prev?.contains(p.id) == true
-            val limit = if (was) p.radiusM + 30 else p.radiusM // 경계 GPS 흔들림 방지
-            if (Geo.distM(lat, lng, p.lat, p.lng) <= limit) cur.add(p.id)
+        if (prev == null) {
+            // 처음에는 현재 상태만 기준으로 잡는다 (가짜 도착 알림 방지)
+            val init = HashSet<String>()
+            for (p in ps) if (Geo.distM(lat, lng, p.lat, p.lng) <= p.radiusM) init.add(p.id)
+            insideMe = init
+            pending.clear()
+            return
         }
-        if (prev != null) {
-            val who = "${_profile.value.name} 님이"
-            for (p in ps) {
-                val was = prev.contains(p.id)
-                val now = cur.contains(p.id)
-                val arrive = "$who ${p.name}에 도착했어요"
-                val leave = "$who ${p.name}에서 출발했어요"
-                if (!was && now) { if (p.shared) pushEvent("ARRIVE", arrive) else Notifier.alert(app, arrive) }
-                if (was && !now) { if (p.shared) pushEvent("LEAVE", leave) else Notifier.alert(app, leave) }
+        val cur = HashSet(prev)
+        val who = "${_profile.value.name} 님이"
+        val now = System.currentTimeMillis()
+        for (p in ps) {
+            val was = prev.contains(p.id)
+            val d = Geo.distM(lat, lng, p.lat, p.lng)
+            val limit = if (was) p.radiusM + maxOf(30f, acc) else p.radiusM.toFloat()
+            val raw = d <= limit
+            if (raw == was) {
+                pending.remove(p.id)
+                continue
+            }
+            val n = (pending[p.id] ?: 0) + 1
+            if (n < 2) {
+                pending[p.id] = n
+                continue
+            }
+            pending.remove(p.id)
+            if (raw) cur.add(p.id) else cur.remove(p.id)
+            val last = lastEventAt[p.id] ?: 0L
+            if (now - last < 60_000L) continue // 쿨다운: 상태만 바꾸고 알림은 생략
+            lastEventAt[p.id] = now
+            val arrive = "$who ${p.name}에 도착했어요"
+            val leave = "$who ${p.name}에서 출발했어요"
+            if (raw) {
+                if (p.shared) pushEvent("ARRIVE", arrive) else Notifier.alert(app, arrive)
+            } else {
+                if (p.shared) pushEvent("LEAVE", leave) else Notifier.alert(app, leave)
             }
         }
         insideMe = cur
     }
+
+    private val pending = HashMap<String, Int>()
+    private val lastEventAt = HashMap<String, Long>()
 
     /** 배터리가 20% 이하로 떨어지면 가족에게 한 번 알린다. 충전하거나 30%를 넘으면 다시 준비. */
     private fun checkLowBattery(b: Int, charging: Boolean) {
@@ -516,6 +640,20 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         m["uid"] = uid ?: ""
         db.getReference("circles/$c/events").push().setValue(m)
         Notifier.alert(app, text) // 내 폰에도 알림 (다른 가족은 DB 변경을 감지해서 알림)
+    }
+
+    override fun updatePlace(id: String, name: String, lat: Double, lng: Double, radiusM: Int, kind: String, shared: Boolean) {
+        val c = cid ?: return
+        val old = _places.value.firstOrNull { it.id == id }
+        val m = HashMap<String, Any>()
+        m["name"] = name.trim().ifEmpty { kind }
+        m["lat"] = lat
+        m["lng"] = lng
+        m["r"] = radiusM
+        m["kind"] = kind
+        m["shared"] = shared
+        m["owner"] = old?.owner?.takeIf { it.isNotEmpty() } ?: (uid ?: "")
+        db.getReference("circles/$c/places/$id").updateChildren(m)
     }
 
     override fun setPlaceShared(id: String, shared: Boolean) {

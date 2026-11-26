@@ -121,6 +121,9 @@ fun FamilyMapView(
     fitTrack: Boolean = false,
     onMemberClick: (String) -> Unit = {},
     onCenterChange: ((Double, Double) -> Unit)? = null,
+    /** 장소 편집용: 지도 가운데 기준 이 반경(m)이 화면에서 몇 px인지 알려준다 */
+    previewRadiusM: Int? = null,
+    onPreviewPx: ((Float) -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
     var kakaoMap by remember { mutableStateOf<KakaoMap?>(null) }
@@ -129,6 +132,8 @@ fun FamilyMapView(
 
     val memberClick by rememberUpdatedState(onMemberClick)
     val centerCallback by rememberUpdatedState(onCenterChange)
+    val pxCallback by rememberUpdatedState(onPreviewPx)
+    var camTick by remember { mutableStateOf(0) }
 
     // 지도 시작 (한 번만)
     DisposableEffect(mapView) {
@@ -148,6 +153,7 @@ fun FamilyMapView(
                     }
                     map.setOnCameraMoveEndListener { _, pos, _ ->
                         centerCallback?.invoke(pos.position.latitude, pos.position.longitude)
+                        camTick++
                     }
                     kakaoMap = map
                 }
@@ -186,6 +192,17 @@ fun FamilyMapView(
         } else {
             map.moveCamera(CameraUpdateFactory.newCenterPosition(target), CameraAnimation.from(400, true, true))
         }
+    }
+
+    // 반경 미리보기: 지도 가운데에서 반경(m)이 화면 몇 px인지 계산 (확대/축소·이동 뒤, 반경 변경 시)
+    LaunchedEffect(kakaoMap, previewRadiusM, camTick) {
+        val map = kakaoMap ?: return@LaunchedEffect
+        val r = previewRadiusM ?: return@LaunchedEffect
+        val c = map.cameraPosition?.position ?: return@LaunchedEffect
+        val dLng = r / (111320.0 * Math.cos(Math.toRadians(c.latitude)))
+        val p1 = map.toScreenPoint(c) ?: return@LaunchedEffect
+        val p2 = map.toScreenPoint(LatLng.from(c.latitude, c.longitude + dLng)) ?: return@LaunchedEffect
+        pxCallback?.invoke(Math.abs(p2.x - p1.x).toFloat())
     }
 
     // 이동 경로 전체 보기

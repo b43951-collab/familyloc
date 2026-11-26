@@ -15,9 +15,10 @@ class HistoryStore(ctx: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var last: TrackPoint? = null
 
-    fun append(lat: Double, lng: Double, t: Long) {
+    /** 기록했으면 true (너무 가깝거나 방금 기록했으면 false) */
+    fun append(lat: Double, lng: Double, t: Long): Boolean {
         val l = last
-        if (l != null && Geo.distM(l.lat, l.lng, lat, lng) < 15.0 && t - l.t < 10 * 60_000L) return
+        if (l != null && Geo.distM(l.lat, l.lng, lat, lng) < 15.0 && t - l.t < 10 * 60_000L) return false
         last = TrackPoint(t, lat, lng)
         scope.launch {
             synchronized(lock) {
@@ -28,6 +29,7 @@ class HistoryStore(ctx: Context) {
                 }
             }
         }
+        return true
     }
 
     fun read(fromMs: Long, toMs: Long): List<TrackPoint> {
