@@ -383,6 +383,37 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
             }
         }
 
+        // ---------- 서버 사용량 ----------
+        item {
+            SectionCard("서버 사용량 확인") {
+                Text(
+                    "무료 한도를 넘는지 가끔 확인하세요. (구글/카카오 로그인이 필요해요)\nFirebase 무료: 저장 1GB · 다운로드 월 10GB · 동시 접속 100",
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            open(
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("https://console.firebase.google.com/project/familyloc-f00ad/database/familyloc-f00ad-default-rtdb/usage"),
+                                )
+                            )
+                        },
+                    ) { Text("Firebase", maxLines = 1) }
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            open(Intent(Intent.ACTION_VIEW, Uri.parse("https://developers.kakao.com/console/app/1666290")))
+                        },
+                    ) { Text("카카오 지도", maxLines = 1) }
+                }
+            }
+        }
+
         // ---------- 데모 / 정보 ----------
         item {
             SectionCard("앱 정보") {
