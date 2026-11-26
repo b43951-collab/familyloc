@@ -101,6 +101,14 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
     private var cid: String? = null
     private val profiles = LinkedHashMap<String, Pair<String, Long>>() // uid -> (이름, 색)
     private val emojis = HashMap<String, String>()
+    private val recent = HashMap<String, java.util.ArrayDeque<com.myfamily.locshare.util.AutoStatus.Sample>>()
+
+    private fun addSample(u: String, t: Long, lat: Double, lng: Double, spd: Float) {
+        val q = recent.getOrPut(u) { java.util.ArrayDeque() }
+        if (q.peekLast()?.t == t) return
+        q.addLast(com.myfamily.locshare.util.AutoStatus.Sample(t, lat, lng, spd))
+        while (q.size > 20 || (q.size > 1 && t - q.peekFirst()!!.t > 300_000L)) q.removeFirst()
+    }
     private val locs = HashMap<String, Loc>()
     private var myLast: Loc? = null
     private var insideMe: Set<String>? = null
@@ -299,6 +307,7 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
                     t = (ch.num("t") ?: 0.0).toLong(),
                     sharing = sharing,
                 )
+                if (sharing && k != uid) locs[k]?.let { addSample(k, it.t, it.lat, it.lng, it.spd) }
             }
             publish()
         }
@@ -396,6 +405,7 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         profiles.clear()
         emojis.clear()
         locs.clear()
+        recent.clear()
         allEvents = emptyList()
         _members.value = emptyList()
         _places.value = emptyList()
@@ -424,11 +434,15 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
             val name = if (isMe) _profile.value.name else prof.first
             val color = if (isMe) _profile.value.color else prof.second
             val l: Loc? = if (isMe && _settings.value.sharing && ml != null) ml else locs[u]
-            val emo = if (isMe) _profile.value.emoji else (emojis[u] ?: "")
+            val chosen = if (isMe) _profile.value.emoji else (emojis[u] ?: "")
             if (l != null && l.sharing) {
-                out.add(Member(u, name, color, l.lat, l.lng, l.acc, l.spd, l.bat, l.chg, l.t, true, isMe, emo))
+                val auto = chosen.isEmpty()
+                val emo = if (auto) com.myfamily.locshare.util.AutoStatus.pick(
+                    recent[u]?.toList() ?: emptyList(), System.currentTimeMillis(), l.t, l.lat, l.lng, _places.value,
+                ) else chosen
+                out.add(Member(u, name, color, l.lat, l.lng, l.acc, l.spd, l.bat, l.chg, l.t, true, isMe, emo, auto && emo.isNotEmpty()))
             } else {
-                out.add(Member(u, name, color, 0.0, 0.0, 0f, 0f, -1, false, l?.t ?: 0L, false, isMe, emo))
+                out.add(Member(u, name, color, 0.0, 0.0, 0f, 0f, -1, false, l?.t ?: 0L, false, isMe, chosen))
             }
         }
         _members.value = out
@@ -449,6 +463,7 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
         val u = uid ?: return
         val c = cid ?: return
         myLast = Loc(lat, lng, accuracyM, speedMps, battery, charging, time, true)
+        addSample(u, time, lat, lng, speedMps)
         val recorded = history.append(lat, lng, time)
         if (speedMps >= 1.0f) lastMoveAt = time
         evaluateMe(lat, lng, accuracyM, time)

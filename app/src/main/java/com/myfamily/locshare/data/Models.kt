@@ -15,6 +15,8 @@ data class Member(
     val sharing: Boolean = true,
     val isMe: Boolean = false,
     val emoji: String = "",
+    /** true면 emoji가 직접 고른 게 아니라 자동 판정 결과 */
+    val auto: Boolean = false,
 )
 
 /** 장소 (집/학교/직장 등) - 도착/출발 알림의 기준 */
