@@ -71,6 +71,9 @@ private class Draft(
     var shared by mutableStateOf(shared)
 }
 
+/** 종류 버튼 대신 이름으로 추정: "집"이 들어가면 집 아이콘, 아니면 기존 종류 유지 */
+private fun kindOf(d: Draft): String = if (d.name.contains("집")) "집" else d.kind
+
 @Composable
 fun PlacesScreen(repo: FamilyRepository) {
     val members by repo.members.collectAsState()
@@ -135,7 +138,7 @@ fun PlacesScreen(repo: FamilyRepository) {
             )
             if (d == null) {
                 ExtendedFloatingActionButton(
-                    onClick = { draft = Draft(null, "", "집", 150f, true) },
+                    onClick = { draft = Draft(null, "", "기타", 150f, true) },
                     icon = { Icon(Icons.Default.Add, contentDescription = null) },
                     text = { Text("지도 가운데에 장소 추가") },
                     modifier = Modifier
@@ -151,9 +154,9 @@ fun PlacesScreen(repo: FamilyRepository) {
                 onCancel = { draft = null },
                 onSave = {
                     if (d.id == null) {
-                        repo.addPlace(d.name, center.first, center.second, d.radius.toInt(), d.kind, d.shared)
+                        repo.addPlace(d.name, center.first, center.second, d.radius.toInt(), kindOf(d), d.shared)
                     } else {
-                        repo.updatePlace(d.id, d.name, center.first, center.second, d.radius.toInt(), d.kind, d.shared)
+                        repo.updatePlace(d.id, d.name, center.first, center.second, d.radius.toInt(), kindOf(d), d.shared)
                     }
                     draft = null
                 },
@@ -212,55 +215,43 @@ fun PlacesScreen(repo: FamilyRepository) {
 private fun EditPanel(d: Draft, onCancel: () -> Unit, onSave: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
     ) {
         Column(
             Modifier
-                .padding(14.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            Text(
-                if (d.id == null) "장소 추가 · 지도를 움직여 위치를 맞춰요" else "장소 수정 · 지도를 움직이면 위치가 바뀌어요",
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-            )
-            Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = d.name,
                 onValueChange = { d.name = it },
-                label = { Text("이름 (비우면 종류 이름)") },
+                placeholder = { Text(if (d.id == null) "장소 이름 (지도를 움직여 위치 맞추기)" else "장소 이름 (지도를 움직이면 위치가 바뀌어요)", fontSize = 13.sp) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("집", "학교", "직장", "기타").forEach { k ->
-                    FilterChip(selected = d.kind == k, onClick = { d.kind = k }, label = { Text(k) })
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("반경 ${d.radius.toInt()}m", fontSize = 13.sp, modifier = Modifier.width(78.dp))
+                Slider(
+                    value = d.radius,
+                    onValueChange = { d.radius = it },
+                    valueRange = 100f..500f,
+                    steps = 7,
+                    modifier = Modifier.weight(1f),
+                )
             }
-            Text("반경 ${d.radius.toInt()}m (원이 지도에 바로 보여요)", fontSize = 13.sp)
-            Slider(
-                value = d.radius,
-                onValueChange = { d.radius = it },
-                valueRange = 100f..500f,
-                steps = 7,
-            )
-            Row(
-                Modifier.clickable { d.shared = !d.shared },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Checkbox(checked = d.shared, onCheckedChange = { d.shared = it })
-                Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier
+                        .weight(1f)
+                        .clickable { d.shared = !d.shared },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = d.shared, onCheckedChange = { d.shared = it })
                     Text("가족과 공유", fontSize = 14.sp)
-                    Text("체크하면 가족 장소에 자동 추가돼요", fontSize = 11.sp, color = Color.Gray)
                 }
-            }
-            Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onSave, modifier = Modifier.weight(1f)) {
-                    Text(if (d.id == null) "여기에 추가" else "저장")
-                }
-                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("취소") }
+                TextButton(onClick = onCancel) { Text("취소") }
+                Button(onClick = onSave) { Text(if (d.id == null) "추가" else "저장") }
             }
         }
     }
