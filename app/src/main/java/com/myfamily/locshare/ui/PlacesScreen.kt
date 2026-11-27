@@ -25,6 +25,19 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.Surface
+import kotlinx.coroutines.launch
+import com.myfamily.locshare.data.PlaceSearch
+import com.myfamily.locshare.data.SearchHit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -96,6 +109,28 @@ fun PlacesScreen(repo: FamilyRepository) {
     var deleteTarget by remember { mutableStateOf<Place?>(null) }
     var radiusPx by remember { mutableStateOf(0f) }
 
+    // 주소·장소명 검색
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val focusMgr = LocalFocusManager.current
+    var query by remember { mutableStateOf("") }
+    var hits by remember { mutableStateOf<List<SearchHit>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+    var searchMsg by remember { mutableStateOf<String?>(null) }
+    var searched by remember { mutableStateOf(false) }
+    fun runSearch() {
+        if (query.isBlank() || searching) return
+        searching = true
+        searchMsg = null
+        scope.launch {
+            val r = PlaceSearch.search(ctx, query, center.first, center.second)
+            searching = false
+            searched = true
+            r.onSuccess { hits = it; if (it.isEmpty()) searchMsg = "검색 결과가 없어요" }
+                .onFailure { hits = emptyList(); searchMsg = "검색에 실패했어요 (${it.message ?: "네트워크 확인"})" }
+        }
+    }
+
     LaunchedEffect(me != null) {
         val m = me
         if (m != null && focus == null) {
@@ -137,6 +172,81 @@ fun PlacesScreen(repo: FamilyRepository) {
                     .offset(y = (-18).dp)
                     .size(36.dp),
             )
+            // 검색창 (지도 위쪽)
+            Column(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                Surface(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                    color = Color.White,
+                    shadowElevation = 4.dp,
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = Color.Black),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { focusMgr.clearFocus(); runSearch() }),
+                            modifier = Modifier.weight(1f).padding(vertical = 13.dp),
+                            decorationBox = { inner ->
+                                if (query.isEmpty()) Text("주소·장소명 검색 (예: 부발읍 893, 이천역)", color = Color.Gray, fontSize = 13.sp)
+                                inner()
+                            },
+                        )
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = { query = ""; hits = emptyList(); searchMsg = null; searched = false }) {
+                                Icon(Icons.Default.Clear, contentDescription = "지우기", tint = Color.Gray)
+                            }
+                        }
+                        IconButton(onClick = { focusMgr.clearFocus(); runSearch() }) {
+                            Icon(Icons.Default.Search, contentDescription = "검색", tint = Color(0xFF2962FF))
+                        }
+                    }
+                }
+                if (searching || hits.isNotEmpty() || searchMsg != null) {
+                    Surface(
+                        modifier = Modifier.padding(top = 6.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        shadowElevation = 4.dp,
+                    ) {
+                        Column(Modifier.fillMaxWidth().heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
+                            if (searching) Text("검색 중…", modifier = Modifier.padding(14.dp), fontSize = 13.sp, color = Color.Gray)
+                            searchMsg?.let { Text(it, modifier = Modifier.padding(14.dp), fontSize = 13.sp, color = Color.Gray) }
+                            hits.forEach { h ->
+                                Column(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            focus = MapFocus(h.lat, h.lng, 17.0, System.nanoTime())
+                                            val cur = draft
+                                            if (cur == null) {
+                                                draft = Draft(null, if (h.isPlace) h.name else "", "기타", 150f, true)
+                                            } else if (cur.name.isBlank() && h.isPlace) {
+                                                cur.name = h.name
+                                            }
+                                            hits = emptyList(); searchMsg = null
+                                            focusMgr.clearFocus()
+                                        }
+                                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                                ) {
+                                    Text(h.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                    if (h.addr.isNotEmpty()) Text(h.addr, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
+                                }
+                                HorizontalDivider()
+                            }
+                        }
+                    }
+                }
+            }
             if (d == null) {
                 SmallFloatingActionButton(
                     onClick = { draft = Draft(null, "", "기타", 150f, true) },
