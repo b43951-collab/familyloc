@@ -53,13 +53,15 @@ open class FamilyWidget : AppWidgetProvider() {
             else -> WKind.L
         }
 
-        /** 앱이 최신 가족 상태를 알려줄 때 호출. 30초에 한 번만 갱신해요. */
+        private var lastLines: String? = null
+        private var pending: Runnable? = null
+        private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+        /** 앱이 최신 가족 상태를 알려줄 때 호출. 내용이 바뀐 경우만, 최소 10초 간격으로 갱신(너무 잦으면 마지막 값을 나중에 반영). */
         fun push(ctx: Context, members: List<Member>, places: List<Place>) {
-            val now = System.currentTimeMillis()
-            if (now - lastPush < 30_000L) return
-            lastPush = now
             val lines = members.take(8).joinToString("\n") { m ->
                 val where = when {
+                    m.updatedAt <= 0L -> "정보 없음"   // 아직 위치를 못 받은 상태 (공유 꺼짐과 구분)
                     !m.sharing -> "공유 꺼짐"
                     else -> {
                         val inPlace = places.firstOrNull {
@@ -77,12 +79,25 @@ open class FamilyWidget : AppWidgetProvider() {
                     m.updatedAt.toString(), m.battery.toString(), if (m.charging) "1" else "0",
                 ).joinToString("\t")
             }
-            ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
-                .putString(KEY, lines).putLong(KEY_AT, now).apply()
-            refresh(ctx)
+            if (lines == lastLines) return
+            val app = ctx.applicationContext
+            pending?.let { handler.removeCallbacks(it) }
+            val wait = 10_000L - (System.currentTimeMillis() - lastPush)
+            val job = Runnable {
+                pending = null
+                lastPush = System.currentTimeMillis()
+                lastLines = lines
+                app.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
+                    .putString(KEY, lines).putLong(KEY_AT, lastPush).apply()
+                refresh(app)
+            }
+            if (wait <= 0L) job.run() else { pending = job; handler.postDelayed(job, wait) }
         }
 
         fun clear(ctx: Context) {
+            pending?.let { handler.removeCallbacks(it) }
+            pending = null
+            lastLines = null
             ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().remove(KEY).apply()
             refresh(ctx)
         }
