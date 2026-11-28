@@ -307,6 +307,36 @@ fun SettingsScreen(repo: FamilyRepository, tick: Int) {
             }
         }
 
+        // ---------- 배터리 부족 알림 ----------
+        item {
+            SectionCard("배터리 부족 알림") {
+                SwitchRow(
+                    "배터리 부족 알림",
+                    "내 배터리가 부족하면 가족에게 알려요 (기본 켜짐)",
+                    settings.lowBatOn,
+                ) { repo.setLowBattery(it, settings.lowBatPlaces, settings.lowBatLevel) }
+                if (settings.lowBatOn) {
+                    SwitchRow(
+                        "저장된 장소에서도 알림",
+                        if (settings.lowBatPlaces) "집·학교 등 어디서나 알려요"
+                        else "저장된 장소 밖에서만 알려요 (장소 안이면 나갈 때 알려요)",
+                        settings.lowBatPlaces,
+                    ) { repo.setLowBattery(true, it, settings.lowBatLevel) }
+                    var lv by androidx.compose.runtime.remember(settings.lowBatLevel) {
+                        androidx.compose.runtime.mutableFloatStateOf(settings.lowBatLevel.toFloat())
+                    }
+                    Text("알림 기준 ${lv.toInt()}% 이하", fontWeight = FontWeight.Medium)
+                    androidx.compose.material3.Slider(
+                        value = lv,
+                        onValueChange = { lv = it },
+                        onValueChangeFinished = { repo.setLowBattery(true, settings.lowBatPlaces, lv.toInt()) },
+                        valueRange = 5f..50f,
+                        steps = 8,
+                    )
+                }
+            }
+        }
+
         // ---------- 거리 알림 ----------
         item {
             SectionCard("거리 알림") {

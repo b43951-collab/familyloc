@@ -86,6 +86,9 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
             distTarget = prefs.getString("dist_target", "") ?: "",
             muted = prefs.getStringSet("muted_ids", emptySet())?.toSet() ?: emptySet(),
             selfAlert = prefs.getBoolean("self_alert", false),
+            lowBatOn = prefs.getBoolean("lowbat_on", true),
+            lowBatPlaces = prefs.getBoolean("lowbat_places", true),
+            lowBatLevel = prefs.getInt("lowbat_level", 10),
         )
     )
 
@@ -634,22 +637,36 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
     private val pending = HashMap<String, Int>()
     private val lastEventAt = HashMap<String, Long>()
 
-    /** 배터리가 20% 이하로 떨어지면 가족에게 한 번 알린다. 충전하거나 30%를 넘으면 다시 준비. */
+    /**
+     * 배터리 부족 알림(가족에게). 설정: 켜기/끄기, 저장된 장소 안에서도 알릴지, 기준 %(기본 10).
+     * 기준 이하로 내려가면 한 번 알리고, 충전하거나 기준+10% 이상이 되면 다시 준비한다.
+     * "저장된 장소에서는 안 알림"이면 장소 밖에 있을 때만 알리고, 장소 안이면 보류했다가 밖으로 나가면 알린다.
+     */
     private fun checkLowBattery(b: Int, charging: Boolean) {
         if (b < 0) return
-        if (charging || b >= 30) {
-            if (prefs.getBoolean("low_sent", false)) prefs.edit().putBoolean("low_sent", false).apply()
+        val st = _settings.value
+        val level = st.lowBatLevel
+        if (!st.lowBatOn) return
+        if (charging || b >= level + 10) {
+            val e = prefs.edit()
+            if (prefs.getBoolean("low_sent", false)) e.putBoolean("low_sent", false)
+            if (prefs.getBoolean("low5_sent", false)) e.putBoolean("low5_sent", false)
+            e.apply()
             return
         }
-        if (b <= 5 && !prefs.getBoolean("low5_sent", false)) {
-            prefs.edit().putBoolean("low5_sent", true).apply()
-            pushEvent("INFO", "${_profile.value.name} 님의 배터리가 ${b}%예요. 곧 꺼질 수 있어요 (마지막 위치가 기록됐어요)")
-        } else if (b > 8 && prefs.getBoolean("low5_sent", false)) {
-            prefs.edit().putBoolean("low5_sent", false).apply()
+        if (b > level) return
+        if (!st.lowBatPlaces) {
+            val l = myLast
+            if (l != null && _places.value.any { Geo.distM(l.lat, l.lng, it.lat, it.lng) <= it.radiusM + 30 }) return
         }
-        if (b <= 20 && !prefs.getBoolean("low_sent", false)) {
+        if (!prefs.getBoolean("low_sent", false)) {
             prefs.edit().putBoolean("low_sent", true).apply()
             pushEvent("INFO", "${_profile.value.name} 님의 배터리가 ${b}% 남았어요")
+        }
+        // 기준이 5%보다 높게 잡혀 있으면, 5% 이하에서 마지막 위치 기록 안내를 한 번 더
+        if (level > 5 && b <= 5 && !prefs.getBoolean("low5_sent", false)) {
+            prefs.edit().putBoolean("low5_sent", true).apply()
+            pushEvent("INFO", "${_profile.value.name} 님의 배터리가 ${b}%예요. 곧 꺼질 수 있어요 (마지막 위치가 기록됐어요)")
         }
     }
 
@@ -745,6 +762,11 @@ class FirebaseFamilyRepository(context: Context) : FamilyRepository {
     override fun setMode(mode: Int) {
         prefs.edit().putInt("mode", mode).apply()
         _settings.value = _settings.value.copy(mode = mode)
+    }
+
+    override fun setLowBattery(on: Boolean, atPlaces: Boolean, level: Int) {
+        prefs.edit().putBoolean("lowbat_on", on).putBoolean("lowbat_places", atPlaces).putInt("lowbat_level", level).apply()
+        _settings.value = _settings.value.copy(lowBatOn = on, lowBatPlaces = atPlaces, lowBatLevel = level)
     }
 
     override fun setSelfAlert(on: Boolean) {

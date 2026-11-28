@@ -47,6 +47,9 @@ class LocalFamilyRepository(context: Context) : FamilyRepository {
             distTarget = prefs.getString("dist_target", "") ?: "",
             muted = prefs.getStringSet("muted_ids", emptySet())?.toSet() ?: emptySet(),
             selfAlert = prefs.getBoolean("self_alert", false),
+            lowBatOn = prefs.getBoolean("lowbat_on", true),
+            lowBatPlaces = prefs.getBoolean("lowbat_places", true),
+            lowBatLevel = prefs.getInt("lowbat_level", 10),
         )
     )
     private val _places = MutableStateFlow(loadPlaces())
@@ -235,6 +238,11 @@ class LocalFamilyRepository(context: Context) : FamilyRepository {
     override fun setMode(mode: Int) {
         prefs.edit().putInt("mode", mode).apply()
         _settings.value = _settings.value.copy(mode = mode)
+    }
+
+    override fun setLowBattery(on: Boolean, atPlaces: Boolean, level: Int) {
+        prefs.edit().putBoolean("lowbat_on", on).putBoolean("lowbat_places", atPlaces).putInt("lowbat_level", level).apply()
+        _settings.value = _settings.value.copy(lowBatOn = on, lowBatPlaces = atPlaces, lowBatLevel = level)
     }
 
     override fun setSelfAlert(on: Boolean) {

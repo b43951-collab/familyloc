@@ -67,4 +67,8 @@ data class Settings(
     val muted: Set<String> = emptySet(),
     /** 내 도착/출발 알림을 이 폰에서 받을지 (기본 꺼짐) */
     val selfAlert: Boolean = false,
+    /** 배터리 부족 알림: 켜기/끄기, 저장된 장소 안에서도 알릴지, 기준 % */
+    val lowBatOn: Boolean = true,
+    val lowBatPlaces: Boolean = true,
+    val lowBatLevel: Int = 10,
 )
